@@ -69,6 +69,10 @@ export default function ApplyPage() {
   const [phone, setPhone] = useState(profile?.phone ?? '');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  // getRegistration 在「查無此筆」「RLS 擋下別人的報名」「查詢出錯」
+  // 三種情況都回傳 null，此時要明確告知家長，不能讓畫面停在
+  // 「標題顯示修改、欄位卻全部空白」這種看不出原因的狀態。
+  const [editError, setEditError] = useState('');
 
   const studentNameIme = useImeGuardedInput(setStudentName);
   const classNameIme = useImeGuardedInput(setClassName);
@@ -77,8 +81,15 @@ export default function ApplyPage() {
   // 編輯模式：把既有內容載進表單
   useEffect(() => {
     if (!editId) return;
+    // 元件卸載後（例如使用者切走頁面）就不該再對已經不存在的元件呼叫
+    // setState，沿用 AuthProvider.tsx／SchoolSelector.tsx 已有的旗標慣例
+    let active = true;
     getRegistration(editId).then((existing) => {
-      if (!existing) return;
+      if (!active) return;
+      if (!existing) {
+        setEditError('找不到這筆報名，可能已被刪除或不屬於您');
+        return;
+      }
       setStudentName(existing.student_name);
       setGender(existing.student_gender);
       setBirthday(existing.student_birthday);
@@ -95,6 +106,9 @@ export default function ApplyPage() {
       setRelation(existing.relation);
       setPhone(existing.contact_phone);
     });
+    return () => {
+      active = false;
+    };
   }, [editId]);
 
   function handleSchoolChange(next: SchoolSelection) {
@@ -173,6 +187,15 @@ export default function ApplyPage() {
           : '請填寫孩子的基本資料，我們會盡快與您聯繫。'}
       </p>
 
+      {editError && (
+        <p
+          role="alert"
+          className="mt-6 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700"
+        >
+          {editError}
+        </p>
+      )}
+
       <form onSubmit={handleSubmit} className="mt-8 space-y-8" noValidate>
         <section className="rounded-2xl bg-white p-5 shadow-sm sm:p-6">
           <h2 className="text-lg font-semibold text-slate-900">學生資訊</h2>
@@ -244,7 +267,9 @@ export default function ApplyPage() {
                 測試工具（testing-library）算 label 的可存取名稱時，會把 <label>
                 底下所有子節點的文字全部串起來，塞在裡面會讓 getByLabelText('班級')
                 比對到「班級（選填）」而找不到欄位。抽成同一行的相鄰元素，
-                視覺上維持原樣，可存取名稱仍是單純的「班級」。
+                可存取名稱仍是單純的「班級」；再用 aria-describedby 把提示
+                跟輸入框語意連結起來，螢幕閱讀器使用者用 Tab 逐欄位填表時
+                才聽得到「選填」，不會誤以為這是必填欄位。
               */}
               <div className="flex items-center justify-between">
                 <label
@@ -253,7 +278,9 @@ export default function ApplyPage() {
                 >
                   班級
                 </label>
-                <span className="text-xs font-normal text-slate-400">（選填）</span>
+                <span id="class_name-optional" className="text-xs font-normal text-slate-400">
+                  （選填）
+                </span>
               </div>
               <input
                 id="class_name"
@@ -262,6 +289,7 @@ export default function ApplyPage() {
                 onChange={classNameIme.onChange}
                 onCompositionStart={classNameIme.onCompositionStart}
                 onCompositionEnd={classNameIme.onCompositionEnd}
+                aria-describedby="class_name-optional"
                 placeholder="例如：忠班"
                 className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
               />
@@ -362,7 +390,7 @@ export default function ApplyPage() {
 
         <button
           type="submit"
-          disabled={submitting}
+          disabled={submitting || editError !== ''}
           className="w-full rounded-xl bg-brand-600 px-4 py-3.5 text-base font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50 sm:w-auto sm:px-10"
         >
           {submitting ? '送出中…' : isEditing ? '儲存修改' : '送出報名'}

@@ -16,14 +16,29 @@ vi.mock('../../components/SchoolSelector', () => ({
       schoolNameRaw: string;
     }) => void;
   }) => (
-    <button
-      type="button"
-      onClick={() =>
-        onChange({ level: 'elementary', schoolId: 'school-1', schoolNameRaw: '' })
-      }
-    >
-      模擬選擇學校
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={() =>
+          onChange({ level: 'elementary', schoolId: 'school-1', schoolNameRaw: '' })
+        }
+      >
+        模擬選擇學校
+      </button>
+      {/* 模擬「找不到我的學校」手動輸入校名：schoolId 留空、schoolNameRaw 有值 */}
+      <button
+        type="button"
+        onClick={() =>
+          onChange({
+            level: 'elementary',
+            schoolId: '',
+            schoolNameRaw: '某某實驗教育機構',
+          })
+        }
+      >
+        模擬輸入校名
+      </button>
+    </>
   ),
 }));
 
@@ -191,6 +206,38 @@ describe('ApplyPage', () => {
         })
       );
     });
+  });
+
+  it('手動輸入校名（找不到我的學校）時，送出的資料把 school_id 轉成 null', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.type(screen.getByLabelText('學生姓名'), '林小明');
+    await user.click(screen.getByLabelText('男'));
+    await user.type(screen.getByLabelText('生日'), '2016-05-20');
+    await user.click(screen.getByRole('button', { name: '模擬輸入校名' }));
+    await user.selectOptions(screen.getByLabelText('年級'), 'E4');
+    await user.selectOptions(screen.getByLabelText('與學生關係'), 'father');
+    await user.click(screen.getByRole('button', { name: '送出報名' }));
+
+    await waitFor(() => {
+      expect(registrationsModule.createRegistration).toHaveBeenCalledWith(
+        expect.objectContaining({
+          school_id: null,
+          school_name_raw: '某某實驗教育機構',
+        })
+      );
+    });
+  });
+
+  it('帶 ?edit= 但抓不到報名資料時顯示提示並停用送出按鈕', async () => {
+    vi.spyOn(registrationsModule, 'getRegistration').mockResolvedValue(null);
+
+    renderPage('/apply?edit=reg-missing');
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('找不到這筆報名，可能已被刪除或不屬於您');
+    expect(screen.getByRole('button', { name: '儲存修改' })).toBeDisabled();
   });
 
   it('用注音輸入學生姓名時，組字中不寫入半成品，選字完成後才寫入', async () => {
