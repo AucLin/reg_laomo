@@ -76,6 +76,18 @@ export default function SchoolSelector({ value, onChange }: Props) {
     };
   }, [value.schoolId, selected]);
 
+  /*
+    掛載當下的 useState 初始值只顧得到「一開始就有自由文字校名」的情況。
+    Task 13 報名表頁面編輯既有報名時，是先掛載空白表單，等
+    getRegistration(editId) 這個非同步請求 resolve 後才把值餵進來——這時
+    元件早就掛載完畢，初始值判斷完全不會再跑。這裡另外用一個效果盯著
+    value.schoolNameRaw 的後續變化，非空時才切到自由輸入模式，家長原本
+    填的校名才補得回來。
+  */
+  useEffect(() => {
+    if (value.schoolNameRaw !== '') setManualMode(true);
+  }, [value.schoolNameRaw]);
+
   // 防抖動：停止打字 250 毫秒後才查詢，避免每按一個鍵就打一次資料庫
   useEffect(() => {
     // 組字中一律不查 —— 這時的 keyword 是還沒選字的注音符號
@@ -97,6 +109,9 @@ export default function SchoolSelector({ value, onChange }: Props) {
     setSelected(null);
     setKeyword('');
     setResults([]);
+    // 手動輸入模式下的校名也一併作廢：畫面若繼續停在自由輸入模式，
+    // 就會出現「畫面還留著舊校名、父層資料卻已被清空」的不一致
+    setManualMode(false);
     onChange({ level, schoolId: '', schoolNameRaw: '' });
   }
 
@@ -301,10 +316,17 @@ function ManualInput({
     這裡刻意不直接用 value prop 當輸入框的受控值。呼叫端（例如報名表頁面）
     的 onChange 通常要等下一輪 re-render 才會把新值傳回來，若輸入框完全
     綁死 value prop，兩次 keystroke 之間值還沒回傳，畫面就會把使用者剛打的
-    字吃掉。改用本地狀態累積文字，value prop 只在掛載當下用來帶入編輯報名
-    時既有的自由文字校名。
+    字吃掉。改用本地狀態累積文字驅動輸入框顯示。
+
+    但這不代表外部值的「後續變化」可以放著不管：編輯既有報名時，父層常常
+    是非同步把校名餵進來（掛載完才 resolve），這時要讓本地狀態跟著外部
+    value 更新一次，家長原本填的自由文字校名才補得回來顯示。
   */
   const [text, setText] = useState(value);
+
+  useEffect(() => {
+    setText(value);
+  }, [value]);
 
   return (
     <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
