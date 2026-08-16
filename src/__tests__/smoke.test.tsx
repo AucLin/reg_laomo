@@ -1,0 +1,21 @@
+import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import App from '../App';
+
+vi.mock('../lib/supabase', () => ({
+  supabase: {
+    auth: {
+      getSession: () => Promise.resolve({ data: { session: null } }),
+      onAuthStateChange: () => ({
+        data: { subscription: { unsubscribe: () => {} } },
+      }),
+    },
+  },
+}));
+
+describe('App', () => {
+  it('進入頁顯示教育中心名稱', async () => {
+    render(<App />);
+    expect(await screen.findByText('老莫機器人教育中心')).toBeInTheDocument();
+  });
+});

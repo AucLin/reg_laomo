@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+}
+
+/*
+  閃電用 SVG 路徑加 CSS 動畫做，不用影片。
+  影片背景在手機上耗流量又耗電，而閃電這種高對比、短促、間歇的動態，
+  向量圖的節奏更好控制，檔案也小得多。
+
+  節奏刻意做成長間隔、短爆發（大部分時間是暗的），才像真的閃電；
+  持續閃爍會變成干擾。
+*/
+@keyframes lightning-flash {
+  0%,
+  88%,
+  100% {
+    opacity: 0;
+  }
+  90% {
+    opacity: 0.9;
+  }
+  92% {
+    opacity: 0.2;
+  }
+  94% {
+    opacity: 1;
+  }
+  97% {
+    opacity: 0;
+  }
+}
+
+.animate-lightning {
+  animation: lightning-flash 6s ease-in-out infinite;
+}
