@@ -28,6 +28,7 @@ export default function AdminPage() {
     enrolled: 0,
   });
   const [selected, setSelected] = useState<RegistrationWithSchool | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -52,16 +53,34 @@ export default function AdminPage() {
     setFilters(next);
   }
 
+  // 點開新的一筆或關掉明細時，把上一筆留下的錯誤訊息清掉 ——
+  // 不然改完 A 筆失敗，關掉後點開 B 筆，B 筆會莫名其妙先看到 A 筆的錯誤。
+  function handleSelect(registration: RegistrationWithSchool) {
+    setSaveError(null);
+    setSelected(registration);
+  }
+
+  function handleCloseDetail() {
+    setSaveError(null);
+    setSelected(null);
+  }
+
   async function handleSaved(
     id: string,
     status: RegistrationStatus,
     adminNote: string
   ) {
     const { error } = await updateRegistrationStatus(id, status, adminNote);
-    if (!error) {
-      setSelected(null);
-      await load();
+    if (error) {
+      // 存檔失敗：明細視窗留著、列表不重整，把錯誤訊息顯示給管理員看，
+      // 不能悄悄恢復成「儲存」按鈕就當作沒事發生 —— 管理員很可能誤以為
+      // 狀態已經改好，實際上資料庫沒變，後續追蹤與通知全部依錯誤狀態進行。
+      setSaveError(error);
+      return;
     }
+    setSaveError(null);
+    setSelected(null);
+    await load();
   }
 
   async function handleExport() {
@@ -101,7 +120,7 @@ export default function AdminPage() {
             載入中…
           </p>
         ) : (
-          <RegistrationTable rows={rows} onSelect={setSelected} />
+          <RegistrationTable rows={rows} onSelect={handleSelect} />
         )}
       </div>
 
@@ -132,8 +151,9 @@ export default function AdminPage() {
       {selected && (
         <RegistrationDetail
           registration={selected}
-          onClose={() => setSelected(null)}
+          onClose={handleCloseDetail}
           onSaved={handleSaved}
+          error={saveError}
         />
       )}
     </div>

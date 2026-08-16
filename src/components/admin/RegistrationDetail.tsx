@@ -18,9 +18,16 @@ interface Props {
     status: RegistrationStatus,
     adminNote: string
   ) => Promise<void>;
+  /** 儲存失敗時由 AdminPage 傳入的錯誤訊息，undefined／null 代表沒有錯誤 */
+  error?: string | null;
 }
 
-export default function RegistrationDetail({ registration, onClose, onSaved }: Props) {
+export default function RegistrationDetail({
+  registration,
+  onClose,
+  onSaved,
+  error,
+}: Props) {
   const [status, setStatus] = useState<RegistrationStatus>(registration.status);
   const [note, setNote] = useState(registration.admin_note ?? '');
   const [saving, setSaving] = useState(false);
@@ -96,19 +103,29 @@ export default function RegistrationDetail({ registration, onClose, onSaved }: P
           </div>
 
           <div>
-            {/* 「家長看不到」提示文字刻意放在 <label> 外面而非包在裡面 ——
+            {/* 「家長看不到」提示文字放在 <label> 外面而非包在裡面 ——
                 包在 label 裡會讓這個欄位的無障礙名稱（accessible name）
                 變成「內部備註家長看不到」，跟畫面上單獨顯示的「內部備註」
                 對不上，screen.getByLabelText('內部備註') 這種精確比對
-                會找不到元素。拆成兩個相鄰元素，視覺呈現不變，
-                label 的無障礙名稱維持精確的「內部備註」。 */}
-            <label
-              htmlFor="detail-note"
-              className="text-sm font-medium text-slate-700"
-            >
-              內部備註
-            </label>
-            <span className="ml-2 text-sm font-normal text-slate-400">家長看不到</span>
+                會找不到元素。但只拆開還不夠：拆開後提示文字跟輸入框
+                之間沒有任何語意連結，螢幕閱讀器使用者 Tab 到備註欄時
+                只會聽到「內部備註」，聽不到「家長看不到」——而這正是
+                管理員動筆前必須知道的事（決定能不能寫敏感內容）。
+                比照 ApplyPage.tsx 班級欄位「（選填）」的先例，用
+                aria-describedby 把提示文字跟輸入框重新連結起來：
+                無障礙名稱維持精確的「內部備註」，無障礙描述補上
+                「家長看不到」。 */}
+            <div className="flex items-center gap-2">
+              <label
+                htmlFor="detail-note"
+                className="text-sm font-medium text-slate-700"
+              >
+                內部備註
+              </label>
+              <span id="detail-note-hint" className="text-sm font-normal text-slate-400">
+                家長看不到
+              </span>
+            </div>
             <textarea
               id="detail-note"
               value={note}
@@ -116,9 +133,22 @@ export default function RegistrationDetail({ registration, onClose, onSaved }: P
               onChange={noteIme.onChange}
               onCompositionStart={noteIme.onCompositionStart}
               onCompositionEnd={noteIme.onCompositionEnd}
+              aria-describedby="detail-note-hint"
               className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm"
             />
           </div>
+
+          {/* 存檔失敗時要讓管理員清楚看到，不能靜靜恢復成「儲存」按鈕
+              就當作沒事發生 —— 比照 MyRegistrationsPage.tsx 撤回失敗的
+              做法，用 role="alert" 讓錯誤訊息在螢幕閱讀器上也主動播報。 */}
+          {error && (
+            <p
+              role="alert"
+              className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
+            >
+              {error}
+            </p>
+          )}
 
           <div className="flex gap-3">
             <button

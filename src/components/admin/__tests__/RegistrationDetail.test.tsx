@@ -138,4 +138,46 @@ describe('RegistrationDetail', () => {
     fireEvent.change(statusSelect, { target: { value: 'contacted' } });
     expect(noteInput.value).toBe('已致電家長');
   });
+
+  // 品質審查第 1 輪修正：存檔失敗時要有明確提示，AdminPage 把
+  // updateRegistrationStatus 回傳的錯誤文字往下傳給這個元件顯示。
+  it('顯示外部傳入的錯誤訊息', () => {
+    render(
+      <RegistrationDetail
+        registration={registration}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+        error="更新失敗，請稍後再試"
+      />
+    );
+
+    expect(screen.getByRole('alert')).toHaveTextContent('更新失敗，請稍後再試');
+  });
+
+  it('沒有錯誤時不顯示錯誤區塊', () => {
+    render(
+      <RegistrationDetail
+        registration={registration}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  // 品質審查第 1 輪修正：「家長看不到」提示要用 aria-describedby 跟備註欄
+  // 綁在一起，螢幕閱讀器使用者 Tab 到備註欄時才聽得到這段提示；同時
+  // label 的無障礙名稱仍要維持精確的「內部備註」，兩者不衝突。
+  it('內部備註欄位的無障礙描述包含「家長看不到」提示', () => {
+    render(
+      <RegistrationDetail
+        registration={registration}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+      />
+    );
+
+    expect(screen.getByLabelText('內部備註')).toHaveAccessibleDescription('家長看不到');
+  });
 });
