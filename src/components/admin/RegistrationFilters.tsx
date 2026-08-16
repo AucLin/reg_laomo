@@ -7,6 +7,7 @@ import {
   type SchoolLevel,
 } from '../../lib/types';
 import type { AdminFilters } from '../../lib/adminRegistrations';
+import { useImeGuardedInput } from '../../lib/hooks/useImeGuardedInput';
 
 interface Props {
   value: AdminFilters;
@@ -17,6 +18,10 @@ export default function RegistrationFilters({ value, onChange }: Props) {
   function update(patch: Partial<AdminFilters>) {
     onChange({ ...value, ...patch });
   }
+
+  // 搜尋框比對學生姓名、家長姓名，用注音／倉頡輸入時要擋組字期間的半成品，
+  // 不然行政人員選字選到一半就會被送出一次殘缺的 ilike 查詢
+  const keywordIme = useImeGuardedInput((keyword) => update({ keyword }));
 
   const gradeOptions =
     value.level === '' ? [] : getGradeOptions(value.level as SchoolLevel);
@@ -100,7 +105,9 @@ export default function RegistrationFilters({ value, onChange }: Props) {
               id="filter-keyword"
               type="text"
               value={value.keyword}
-              onChange={(event) => update({ keyword: event.target.value })}
+              onChange={keywordIme.onChange}
+              onCompositionStart={keywordIme.onCompositionStart}
+              onCompositionEnd={keywordIme.onCompositionEnd}
               placeholder="學生／家長姓名、電話"
               className="w-full rounded-xl border border-slate-300 py-2 pl-9 pr-3 text-sm"
             />

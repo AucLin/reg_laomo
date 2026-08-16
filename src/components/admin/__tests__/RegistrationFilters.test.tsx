@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
 import RegistrationFilters from '../RegistrationFilters';
@@ -43,6 +43,33 @@ describe('RegistrationFilters', () => {
 
     expect(onChange).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'enrolled' })
+    );
+  });
+
+  it('用注音搜尋時，組字中不送出半成品', async () => {
+    const onChange = vi.fn();
+    render(<RegistrationFilters value={EMPTY_FILTERS} onChange={onChange} />);
+
+    const keywordInput = screen.getByLabelText('搜尋');
+
+    fireEvent.compositionStart(keywordInput);
+    fireEvent.change(keywordInput, { target: { value: 'ㄌㄧㄣˊ' } });
+
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('組字結束後以最終選字結果回報篩選條件', async () => {
+    const onChange = vi.fn();
+    render(<RegistrationFilters value={EMPTY_FILTERS} onChange={onChange} />);
+
+    const keywordInput = screen.getByLabelText('搜尋');
+
+    fireEvent.compositionStart(keywordInput);
+    fireEvent.change(keywordInput, { target: { value: 'ㄌㄧㄣˊ' } });
+    fireEvent.compositionEnd(keywordInput, { target: { value: '林' } });
+
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({ keyword: '林' })
     );
   });
 });
