@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -79,6 +79,42 @@ describe('RegisterPage', () => {
       password: 'password123',
       options: {
         data: { full_name: '林大明', phone: '0912345678' },
+      },
+    });
+  });
+
+  it('用注音輸入中文姓名時，組字中不寫入半成品，選字完成後才寫入', async () => {
+    renderPage();
+
+    const nameInput = screen.getByLabelText('家長姓名') as HTMLInputElement;
+    const phoneInput = screen.getByLabelText('手機號碼') as HTMLInputElement;
+
+    fireEvent.compositionStart(nameInput);
+    fireEvent.change(nameInput, { target: { value: 'ㄨㄤˊ' } });
+
+    // 組字中的半成品不該寫進 React 狀態：讓另一個欄位觸發重新渲染，
+    // 若姓名狀態真的沒被半成品覆蓋，受控欄位會被打回原本的空值。
+    fireEvent.change(phoneInput, { target: { value: '0' } });
+    expect(nameInput.value).toBe('');
+
+    fireEvent.compositionEnd(nameInput, { target: { value: '王小明' } });
+
+    // 選字完成後應該已經寫進狀態：再讓別的欄位觸發一次重新渲染，
+    // 姓名欄位仍要維持最終值，而不是被打回空字串。
+    fireEvent.change(phoneInput, { target: { value: '09' } });
+    expect(nameInput.value).toBe('王小明');
+
+    await userEvent.clear(phoneInput);
+    await userEvent.type(phoneInput, '0912345678');
+    await userEvent.type(screen.getByLabelText('電子信箱'), 'test@example.com');
+    await userEvent.type(screen.getByLabelText('密碼'), 'password123');
+    await userEvent.click(screen.getByRole('button', { name: '建立帳號' }));
+
+    expect(signUpMock).toHaveBeenCalledWith({
+      email: 'test@example.com',
+      password: 'password123',
+      options: {
+        data: { full_name: '王小明', phone: '0912345678' },
       },
     });
   });
