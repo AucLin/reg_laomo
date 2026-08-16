@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "import:schools": "tsx scripts/import-schools.ts"
+    "import:schools": "tsx scripts/import-schools.ts",
+    "verify:rls": "tsx scripts/verify-rls.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.3",
