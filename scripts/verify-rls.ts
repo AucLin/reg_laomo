@@ -55,7 +55,31 @@ async function cleanup(emails: string[]) {
   }
 }
 
+/*
+  這支腳本會對 URL 指向的資料庫做真實的寫入操作：建立／刪除 Auth 帳號、
+  寫入報名、把一個帳號升成 admin。不管指到哪個環境，手滑執行都不是小事，
+  所以執行前一律印出目標網址，並且要求明確帶 --yes 才會真的動手——
+  沒有這個旗標就只印出將要對哪個環境做什麼，不連線、不寫入，直接結束。
+  （若中途被 SIGKILL 之類訊號強制終止，main().catch() 攔不到、cleanup()
+  不會執行，可能留下殘留測試帳號——這是已知限制，需要人工檢查
+  auth.users 裡是否還有 rls-test-a@mailinator.com／rls-test-b@mailinator.com。）
+*/
+function confirmTargetOrExit() {
+  console.log(`目標資料庫：${URL}`);
+  if (!process.argv.includes('--yes')) {
+    console.log(
+      '\n未帶 --yes，不會真的執行。\n' +
+        '這支腳本會對上面這個資料庫：建立兩個測試帳號（rls-test-a／rls-test-b@mailinator.com）、\n' +
+        '寫入一筆測試報名、把其中一個帳號升成 admin，最後刪除這兩個測試帳號。\n' +
+        '確認目標環境無誤後，重跑：npm run verify:rls -- --yes'
+    );
+    process.exit(0);
+  }
+}
+
 async function main() {
+  confirmTargetOrExit();
+
   // Supabase 會拒絕 example.com 網域的信箱，改用 mailinator.com
   const emailA = 'rls-test-a@mailinator.com';
   const emailB = 'rls-test-b@mailinator.com';
@@ -95,12 +119,24 @@ async function main() {
     `實際看到 ${(bSees ?? []).length} 筆`
   );
 
-  // 家長 A 應該改得動自己待審核的報名內容
+  // 家長 A 應該改得動自己待審核的報名內容。
+  // 「應成功」的斷言跟「應被擋下」用同一套嚴謹度：只看 error === null 不夠——
+  // 若 RLS 誤把這筆列濾掉（USING 比對到 0 筆），PostgREST 一樣回傳 error: null，
+  // 會被誤判成「成功」。改用 service_role 讀回資料庫，確認欄位真的變成預期值。
   const { error: editError } = await parentA.client
     .from('registrations')
     .update({ class_name: '孝班' })
     .eq('id', created!.id);
-  check('家長可修改自己待審核的報名', editError === null, editError?.message ?? '');
+  const { data: afterEdit } = await admin
+    .from('registrations')
+    .select('class_name')
+    .eq('id', created!.id)
+    .single();
+  check(
+    '家長可修改自己待審核的報名',
+    editError === null && afterEdit?.class_name === '孝班',
+    `錯誤：${editError?.message ?? '（無）'}／資料庫實際班級：${afterEdit?.class_name}`
+  );
 
   // 家長 B 不該能替家長 A 建立報名
   const { error: forgeError } = await parentB.client
@@ -154,11 +190,21 @@ async function main() {
     `實際看到 ${(adminSees ?? []).length} 筆`
   );
 
+  // 同上：「管理員可以改狀態與內部備註」也要讀回資料庫確認，不能只看 error 是否為 null。
   const { error: noteError } = await parentB.client
     .from('registrations')
     .update({ status: 'contacted', admin_note: '已致電' })
     .eq('id', created!.id);
-  check('管理員可以改狀態與內部備註', noteError === null, noteError?.message ?? '');
+  const { data: afterNote } = await admin
+    .from('registrations')
+    .select('status, admin_note')
+    .eq('id', created!.id)
+    .single();
+  check(
+    '管理員可以改狀態與內部備註',
+    noteError === null && afterNote?.status === 'contacted' && afterNote?.admin_note === '已致電',
+    `錯誤：${noteError?.message ?? '（無）'}／資料庫實際狀態：${afterNote?.status}／備註：${afterNote?.admin_note}`
+  );
 
   const { error: tamperError } = await parentB.client
     .from('registrations')
