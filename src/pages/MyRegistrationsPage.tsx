@@ -10,6 +10,7 @@ export default function MyRegistrationsPage() {
   const [registrations, setRegistrations] = useState<RegistrationWithSchool[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [errorId, setErrorId] = useState<string | null>(null);
 
   useEffect(() => {
     listMyRegistrations()
@@ -17,9 +18,22 @@ export default function MyRegistrationsPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  function handleStartConfirm(id: string) {
+    setErrorId(null);
+    setConfirmingId(id);
+  }
+
   async function handleDelete(id: string) {
     const { error } = await deleteRegistration(id);
-    if (!error) {
+    if (error) {
+      // 撤回被資料庫的列級權限擋下，通常是這筆報名剛好已被行政端
+      // 處理過。重新抓一次清單，讓畫面狀態跟資料庫同步，家長才會
+      // 看到這筆報名其實已經不是待審核，而不是悄悄退回原狀。
+      setErrorId(id);
+      const fresh = await listMyRegistrations();
+      setRegistrations(fresh);
+    } else {
+      setErrorId(null);
       setRegistrations((current) => current.filter((item) => item.id !== id));
     }
     setConfirmingId(null);
@@ -87,6 +101,19 @@ export default function MyRegistrationsPage() {
               {new Date(registration.created_at).toLocaleString('zh-TW')}
             </p>
 
+            {/* 撤回失敗多半是這筆報名剛好已被行政端處理過，資料庫的
+                列級權限擋下了刪除。不論卡片之後顯示哪種狀態，這則
+                錯誤訊息都要露出，家長才知道剛剛按的那次撤回發生了
+                什麼事。 */}
+            {errorId === registration.id && (
+              <p
+                role="alert"
+                className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
+              >
+                這筆報名已進入處理流程，無法撤回，請聯絡中心
+              </p>
+            )}
+
             {/* 待審核才給改動。這與資料庫的列級權限一致 ——
                 介面不提供的操作，資料庫層也一併擋住。 */}
             {registration.status === 'pending' ? (
@@ -118,7 +145,7 @@ export default function MyRegistrationsPage() {
                     </Link>
                     <button
                       type="button"
-                      onClick={() => setConfirmingId(registration.id)}
+                      onClick={() => handleStartConfirm(registration.id)}
                       className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50"
                     >
                       撤回報名

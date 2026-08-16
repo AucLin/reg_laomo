@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MyRegistrationsPage from '../MyRegistrationsPage';
@@ -116,5 +117,77 @@ describe('MyRegistrationsPage', () => {
 
     expect(await screen.findByText('某某實驗教育機構')).toBeInTheDocument();
     expect(screen.getByText('學校待確認')).toBeInTheDocument();
+  });
+
+  it('多筆待審核報名的撤回確認各自獨立，點一筆不影響另一筆', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(registrationsModule, 'listMyRegistrations').mockResolvedValue([
+      makeRegistration({ id: 'reg-1', student_name: '林小明' }),
+      makeRegistration({ id: 'reg-2', student_name: '陳小華' }),
+    ]);
+    renderPage();
+
+    await screen.findByText('林小明');
+    const items = screen.getAllByRole('listitem');
+    expect(items).toHaveLength(2);
+
+    await user.click(within(items[0]).getByRole('button', { name: '撤回報名' }));
+
+    expect(
+      within(items[0]).getByRole('button', { name: '確定撤回' })
+    ).toBeInTheDocument();
+    expect(
+      within(items[0]).getByRole('button', { name: '取消' })
+    ).toBeInTheDocument();
+
+    expect(
+      within(items[1]).getByRole('link', { name: '修改' })
+    ).toBeInTheDocument();
+    expect(
+      within(items[1]).getByRole('button', { name: '撤回報名' })
+    ).toBeInTheDocument();
+    expect(
+      within(items[1]).queryByRole('button', { name: '確定撤回' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('撤回失敗時顯示錯誤訊息、卡片仍在清單裡、並重新整理清單', async () => {
+    const user = userEvent.setup();
+    const listSpy = vi
+      .spyOn(registrationsModule, 'listMyRegistrations')
+      .mockResolvedValueOnce([makeRegistration()])
+      .mockResolvedValueOnce([makeRegistration({ status: 'contacted' })]);
+    vi.spyOn(registrationsModule, 'deleteRegistration').mockResolvedValue({
+      error: '撤回失敗，請稍後再試',
+    });
+    renderPage();
+
+    await screen.findByText('林小明');
+    await user.click(screen.getByRole('button', { name: '撤回報名' }));
+    await user.click(screen.getByRole('button', { name: '確定撤回' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      '這筆報名已進入處理流程，無法撤回，請聯絡中心'
+    );
+    expect(screen.getByText('林小明')).toBeInTheDocument();
+    expect(listSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('撤回成功時卡片從清單消失', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(registrationsModule, 'listMyRegistrations').mockResolvedValue([
+      makeRegistration(),
+    ]);
+    vi.spyOn(registrationsModule, 'deleteRegistration').mockResolvedValue({
+      error: null,
+    });
+    renderPage();
+
+    await screen.findByText('林小明');
+    await user.click(screen.getByRole('button', { name: '撤回報名' }));
+    await user.click(screen.getByRole('button', { name: '確定撤回' }));
+
+    expect(await screen.findByText('您還沒有任何報名紀錄')).toBeInTheDocument();
+    expect(screen.queryByText('林小明')).not.toBeInTheDocument();
   });
 });
