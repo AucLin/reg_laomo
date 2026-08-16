@@ -25,8 +25,15 @@ export default function LoginPage() {
     setSubmitting(false);
 
     if (signInError) {
-      // 不區分「帳號不存在」與「密碼錯誤」，避免洩漏哪些信箱註冊過
-      setError('信箱或密碼不正確');
+      // email_not_confirmed 是唯一需要獨立出來的錯誤：家長註冊後沒收信
+      // 就跑來登入，這不是密碼錯誤，若跟其他錯誤混在一起顯示「信箱或
+      // 密碼不正確」，家長永遠不會知道該去收信。
+      // 其他錯誤（帳號不存在／密碼錯誤）刻意不區分，避免洩漏哪些信箱註冊過。
+      setError(
+        signInError.code === 'email_not_confirmed'
+          ? '這個信箱還沒完成驗證，請到信箱點選確認連結'
+          : '信箱或密碼不正確'
+      );
       return;
     }
 

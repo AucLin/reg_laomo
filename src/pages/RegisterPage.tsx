@@ -11,6 +11,13 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  // Supabase 專案若開啟「Confirm email」（mailer_autoconfirm = false），
+  // signUp 成功時不會回傳 session，這時不能直接導向 /apply ——
+  // ProtectedRoute 看到 user 是 null 會把人踢回登入頁，全程沒有任何
+  // 提示要去收信。這個狀態記著「已註冊成功、正等信箱驗證」，畫面改顯示
+  // 收信說明，不再導頁。
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
+  const [confirmationEmail, setConfirmationEmail] = useState('');
 
   // 姓名欄位用注音、倉頡等輸入法組字時，瀏覽器會在選字完成前不斷觸發
   // onChange（值是「ㄓㄨㄥ」這種半成品）。組字期間先不更新狀態，
@@ -53,8 +60,9 @@ export default function RegisterPage() {
     setSubmitting(true);
     // 姓名與手機放進 metadata，資料庫的 handle_new_user 觸發器會據此
     // 自動建立 profiles 資料列
-    const { error: signUpError } = await supabase.auth.signUp({
-      email: email.trim(),
+    const trimmedEmail = email.trim();
+    const { data, error: signUpError } = await supabase.auth.signUp({
+      email: trimmedEmail,
       password,
       options: {
         data: { full_name: fullName.trim(), phone: phone.trim() },
@@ -71,8 +79,39 @@ export default function RegisterPage() {
       return;
     }
 
-    // 註冊完直接進報名表，不繞回首頁
-    navigate('/apply', { replace: true });
+    if (data.session) {
+      // 信箱驗證關閉（mailer_autoconfirm = true）：signUp 直接回傳
+      // session，照舊直接進報名表，不繞回首頁
+      navigate('/apply', { replace: true });
+      return;
+    }
+
+    // 信箱驗證開啟：signUp 成功但沒有 session，這裡不能導向 /apply
+    // （ProtectedRoute 會因為 user 是 null 把人踢回登入頁）。改顯示
+    // 收信說明。
+    setConfirmationEmail(trimmedEmail);
+    setAwaitingConfirmation(true);
+  }
+
+  if (awaitingConfirmation) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-12">
+        <div className="w-full max-w-md rounded-2xl bg-white p-6 text-center shadow-lg sm:p-8">
+          <h1 className="text-2xl font-bold text-slate-900">請到信箱收信</h1>
+          <p className="mt-4 text-sm text-slate-600">
+            我們已經寄出一封確認信到{' '}
+            <span className="font-semibold text-slate-900">{confirmationEmail}</span>
+            ，請點選信中的連結完成驗證，完成後再回來登入即可開始報名。
+          </p>
+          <Link
+            to="/login"
+            className="mt-6 inline-block rounded-xl bg-brand-600 px-6 py-3 font-semibold text-white transition hover:bg-brand-700"
+          >
+            前往登入
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   return (

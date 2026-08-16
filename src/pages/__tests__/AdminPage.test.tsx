@@ -1,10 +1,20 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import AdminPage from '../AdminPage';
 import * as adminRegistrationsModule from '../../lib/adminRegistrations';
 import * as registrationsModule from '../../lib/registrations';
+import * as useAuthModule from '../../auth/useAuth';
 import type { RegistrationWithSchool } from '../../lib/types';
+
+function renderPage() {
+  return render(
+    <MemoryRouter>
+      <AdminPage />
+    </MemoryRouter>
+  );
+}
 
 function makeRegistration(
   overrides: Partial<RegistrationWithSchool> = {}
@@ -42,6 +52,19 @@ describe('AdminPage', () => {
       contacted: 0,
       enrolled: 0,
     });
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      user: { id: 'admin-1', email: 'admin@example.com' } as never,
+      profile: {
+        id: 'admin-1',
+        full_name: '管理員',
+        phone: '0912345678',
+        role: 'admin',
+        created_at: '2026-08-01',
+      },
+      isAdmin: true,
+      loading: false,
+      signOut: vi.fn(),
+    });
   });
 
   // 品質審查第 1 輪修正：存檔失敗（管理員把狀態改成「已聯絡」、按下
@@ -57,7 +80,7 @@ describe('AdminPage', () => {
       error: '更新失敗，請稍後再試',
     });
 
-    render(<AdminPage />);
+    renderPage();
 
     const nameCells = await screen.findAllByText('林小明');
     await user.click(nameCells[0]);
@@ -85,7 +108,7 @@ describe('AdminPage', () => {
       error: null,
     });
 
-    render(<AdminPage />);
+    renderPage();
 
     const nameCells = await screen.findAllByText('林小明');
     await user.click(nameCells[0]);

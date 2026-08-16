@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MyRegistrationsPage from '../MyRegistrationsPage';
 import * as registrationsModule from '../../lib/registrations';
+import * as useAuthModule from '../../auth/useAuth';
 import type { RegistrationWithSchool } from '../../lib/types';
 
 function makeRegistration(
@@ -44,6 +45,19 @@ function renderPage() {
 describe('MyRegistrationsPage', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
+      user: { id: 'parent-1', email: 'parent@example.com' } as never,
+      profile: {
+        id: 'parent-1',
+        full_name: '林大明',
+        phone: '0912345678',
+        role: 'parent',
+        created_at: '2026-08-01',
+      },
+      isAdmin: false,
+      loading: false,
+      signOut: vi.fn(),
+    });
   });
 
   it('顯示學生姓名、學校與狀態', async () => {
