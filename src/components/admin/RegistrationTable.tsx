@@ -1,0 +1,103 @@
+import StatusBadge from '../StatusBadge';
+import { formatGrade, type RegistrationWithSchool } from '../../lib/types';
+
+interface Props {
+  rows: RegistrationWithSchool[];
+  onSelect: (registration: RegistrationWithSchool) => void;
+}
+
+export default function RegistrationTable({ rows, onSelect }: Props) {
+  if (rows.length === 0) {
+    return (
+      <p className="rounded-2xl bg-white p-8 text-center text-slate-500 shadow-sm">
+        沒有符合條件的報名資料
+      </p>
+    );
+  }
+
+  return (
+    <>
+      {/* 手機：卡片 */}
+      <ul className="space-y-3 lg:hidden">
+        {rows.map((row) => (
+          <li key={row.id}>
+            <button
+              type="button"
+              onClick={() => onSelect(row)}
+              className="w-full rounded-2xl bg-white p-4 text-left shadow-sm transition hover:shadow"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-slate-900">{row.student_name}</p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {row.school_name ?? row.school_name_raw}
+                    {!row.school_id && (
+                      <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800">
+                        待確認
+                      </span>
+                    )}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {formatGrade(row.grade)} · {row.parent_name} · {row.contact_phone}
+                  </p>
+                </div>
+                <StatusBadge status={row.status} />
+              </div>
+            </button>
+          </li>
+        ))}
+      </ul>
+
+      {/* 桌機：表格 */}
+      <div className="hidden overflow-x-auto rounded-2xl bg-white shadow-sm lg:block">
+        <table className="w-full text-sm">
+          <thead className="border-b border-slate-200 text-left text-slate-500">
+            <tr>
+              <th className="px-4 py-3 font-medium">送出時間</th>
+              <th className="px-4 py-3 font-medium">學生姓名</th>
+              <th className="px-4 py-3 font-medium">就讀學校</th>
+              <th className="px-4 py-3 font-medium">年級</th>
+              <th className="px-4 py-3 font-medium">家長</th>
+              <th className="px-4 py-3 font-medium">聯絡電話</th>
+              <th className="px-4 py-3 font-medium">狀態</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {rows.map((row) => (
+              <tr
+                key={row.id}
+                onClick={() => onSelect(row)}
+                className="cursor-pointer transition hover:bg-slate-50"
+              >
+                <td className="whitespace-nowrap px-4 py-3 text-slate-500">
+                  {new Date(row.created_at).toLocaleDateString('zh-TW')}
+                </td>
+                <td className="px-4 py-3 font-medium text-slate-900">
+                  {row.student_name}
+                </td>
+                <td className="px-4 py-3 text-slate-600">
+                  {row.school_name ?? row.school_name_raw}
+                  {!row.school_id && (
+                    <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800">
+                      待確認
+                    </span>
+                  )}
+                </td>
+                <td className="whitespace-nowrap px-4 py-3 text-slate-600">
+                  {formatGrade(row.grade)}
+                </td>
+                <td className="px-4 py-3 text-slate-600">{row.parent_name}</td>
+                <td className="whitespace-nowrap px-4 py-3 text-slate-600">
+                  {row.contact_phone}
+                </td>
+                <td className="px-4 py-3">
+                  <StatusBadge status={row.status} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
