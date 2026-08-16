@@ -5,13 +5,13 @@ import {
   RELATION_LABELS,
   STATUS_LABELS,
   formatGrade,
+  type AdminRegistrationRow,
   type RegistrationStatus,
-  type RegistrationWithSchool,
 } from '../../lib/types';
 import { useImeGuardedInput } from '../../lib/hooks/useImeGuardedInput';
 
 interface Props {
-  registration: RegistrationWithSchool;
+  registration: AdminRegistrationRow;
   onClose: () => void;
   onSaved: (
     id: string,
@@ -32,11 +32,20 @@ export default function RegistrationDetail({
   const [note, setNote] = useState(registration.admin_note ?? '');
   const [saving, setSaving] = useState(false);
 
+  // admin_note 為 undefined 代表這一批備註讀取失敗（見 adminRegistrations.ts
+  // 的 attachNotes()），不是「確認查無備註」。這個狀態下備註框顯示的空字串
+  // 不是真相 —— 若照常讓管理員按下儲存，updateRegistrationStatus 會把這個
+  // 空字串當成「備註清空」upsert 回去，真正的備註就這樣被覆蓋、還無跡可尋。
+  // 備註欄與儲存按鈕都要停用，逼管理員關掉重開（重新整理）再試一次，
+  // 不能只顯示警告卻仍放行儲存。
+  const noteLoadFailed = registration.admin_note === undefined;
+
   // 內部備註是中文輸入框，比照 RegistrationFilters.tsx 的搜尋框，
   // 用共用的 useImeGuardedInput 擋掉注音／倉頡組字期間的半成品。
   const noteIme = useImeGuardedInput<HTMLTextAreaElement>(setNote);
 
   async function handleSave() {
+    if (noteLoadFailed) return;
     setSaving(true);
     await onSaved(registration.id, status, note);
     setSaving(false);
@@ -129,15 +138,30 @@ export default function RegistrationDetail({
                 家長看不到
               </span>
             </div>
+            {/* 備註讀取失敗時，備註欄跟儲存都要停用 —— 見上面 noteLoadFailed
+                的說明。警告文字放在 role="alert"，跟撤回／存檔失敗的既有
+                提示一致，螢幕閱讀器使用者也會主動聽到，不必特地去找。 */}
+            {noteLoadFailed && (
+              <p
+                id="detail-note-warning"
+                role="alert"
+                className="mt-1 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
+              >
+                備註讀取失敗，暫時無法編輯或儲存，請關閉後重新整理再開啟這筆報名試一次
+              </p>
+            )}
             <textarea
               id="detail-note"
               value={note}
               rows={3}
+              disabled={noteLoadFailed}
               onChange={noteIme.onChange}
               onCompositionStart={noteIme.onCompositionStart}
               onCompositionEnd={noteIme.onCompositionEnd}
-              aria-describedby="detail-note-hint"
-              className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm"
+              aria-describedby={
+                noteLoadFailed ? 'detail-note-hint detail-note-warning' : 'detail-note-hint'
+              }
+              className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm disabled:bg-slate-100 disabled:text-slate-400"
             />
           </div>
 
@@ -157,7 +181,7 @@ export default function RegistrationDetail({
             <button
               type="button"
               onClick={handleSave}
-              disabled={saving}
+              disabled={saving || noteLoadFailed}
               className="rounded-xl bg-brand-600 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
             >
               {saving ? '儲存中…' : '儲存'}

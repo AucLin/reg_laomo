@@ -3,7 +3,7 @@ import {
   RELATION_LABELS,
   STATUS_LABELS,
   formatGrade,
-  type RegistrationWithSchool,
+  type AdminRegistrationRow,
 } from './types';
 
 const HEADERS = [
@@ -30,7 +30,7 @@ function escapeField(value: string): string {
   return value;
 }
 
-export function toCsv(registrations: RegistrationWithSchool[]): string {
+export function toCsv(registrations: AdminRegistrationRow[]): string {
   const rows = registrations.map((item) => [
     new Date(item.created_at).toLocaleString('zh-TW'),
     item.student_name,

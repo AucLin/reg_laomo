@@ -24,7 +24,6 @@ function makeRegistration(
     relation: 'father',
     contact_phone: '0912345678',
     status: 'pending',
-    admin_note: '這是內部備註，家長不該看到',
     created_at: '2026-08-10T10:00:00Z',
     updated_at: '2026-08-10T10:00:00Z',
     school_name: '臺北市立中正國小',
@@ -185,12 +184,39 @@ describe('MyRegistrationsPage', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('撤回失敗時顯示錯誤訊息、卡片仍在清單裡、並重新整理清單', async () => {
+  // 最終修正四：deleteRegistration() 會回傳兩種語意不同的錯誤 ——
+  // 被列級權限擋下（這筆報名已進入處理流程）跟真正的資料庫錯誤
+  // （撤回失敗，請稍後再試）。過去這裡不管收到哪一種都寫死同一句
+  // 「已進入處理流程」，資料庫錯誤那種情況會誤導家長去問中心「這筆
+  // 到底處理到哪」。改成直接顯示 error 本身的內容，兩種情況各自
+  // 驗證一次。
+  it('撤回被列級權限擋下時顯示對應錯誤訊息、卡片仍在清單裡、並重新整理清單', async () => {
     const user = userEvent.setup();
     const listSpy = vi
       .spyOn(registrationsModule, 'listMyRegistrations')
       .mockResolvedValueOnce([makeRegistration()])
       .mockResolvedValueOnce([makeRegistration({ status: 'contacted' })]);
+    vi.spyOn(registrationsModule, 'deleteRegistration').mockResolvedValue({
+      error: '這筆報名已進入處理流程，無法撤回',
+    });
+    renderPage();
+
+    await screen.findByText('林小明');
+    await user.click(screen.getByRole('button', { name: '撤回報名' }));
+    await user.click(screen.getByRole('button', { name: '確定撤回' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      '這筆報名已進入處理流程，無法撤回'
+    );
+    expect(screen.getByText('林小明')).toBeInTheDocument();
+    expect(listSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('撤回遇到真正的資料庫錯誤時顯示資料層回傳的錯誤訊息，不是寫死的處理流程文字', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(registrationsModule, 'listMyRegistrations')
+      .mockResolvedValueOnce([makeRegistration()])
+      .mockResolvedValueOnce([makeRegistration()]);
     vi.spyOn(registrationsModule, 'deleteRegistration').mockResolvedValue({
       error: '撤回失敗，請稍後再試',
     });
@@ -200,11 +226,9 @@ describe('MyRegistrationsPage', () => {
     await user.click(screen.getByRole('button', { name: '撤回報名' }));
     await user.click(screen.getByRole('button', { name: '確定撤回' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      '這筆報名已進入處理流程，無法撤回，請聯絡中心'
-    );
-    expect(screen.getByText('林小明')).toBeInTheDocument();
-    expect(listSpy).toHaveBeenCalledTimes(2);
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('撤回失敗，請稍後再試');
+    expect(alert).not.toHaveTextContent('已進入處理流程');
   });
 
   it('撤回成功時卡片從清單消失', async () => {

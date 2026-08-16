@@ -55,18 +55,33 @@ export interface RegistrationNote {
  * 學校欄位是左連接來的，所以「找不到我的學校」那類報名這三個欄位會是 null，
  * 顯示時要退回 school_name_raw。
  *
- * admin_note 不是這張檢視表本身的欄位（它已經拆到 registration_notes、
- * 只開放 is_admin() 的列級權限，家長端完全查不到）。這裡把它列在型別上
- * 是給「管理員後台合併過備註的列」用的 —— adminRegistrations.ts 的
- * listRegistrations／listAllForExport 會額外查一次 registration_notes
- * 再合併進來；家長端（getRegistration／listMyRegistrations）讀到的物件
- * 天生就沒有這個鍵，不受影響，因為那兩支查詢從未合併過備註。
+ * 這個型別不含 admin_note —— 它不是這張檢視表本身的欄位（已經拆到
+ * registration_notes、只開放 is_admin() 的列級權限，家長端完全查不到）。
+ * 家長端（getRegistration／listMyRegistrations）讀到的物件天生就沒有
+ * 這個鍵，型別上不宣告它，`as RegistrationWithSchool` 這個轉型才是誠實
+ * 的、不會讓編譯器放行一個執行期根本不存在的欄位。
  */
 export interface RegistrationWithSchool extends Registration {
   school_name: string | null;
   school_city: string | null;
   school_level: SchoolLevel | null;
-  admin_note: string | null;
+}
+
+/**
+ * 管理員後台專用的延伸型別：合併過內部備註的報名列。只有
+ * adminRegistrations.ts 的 listRegistrations／listAllForExport 會產出
+ * 這個型別，家長端一律用 RegistrationWithSchool（不含 admin_note）。
+ *
+ * admin_note 的三種值意義不同：
+ * - string：確實有備註內容
+ * - null：查詢成功、確認這筆報名沒有備註
+ * - undefined：這一批備註讀取失敗（見 20260817100000 遷移後 attachNotes()
+ *   的分批查詢），不是「查無備註」。RegistrationDetail 必須用這個訊號
+ *   停用備註欄與儲存按鈕，不能讓管理員在不知情的狀態下把真正的備註
+ *   存成空字串覆蓋掉。
+ */
+export interface AdminRegistrationRow extends RegistrationWithSchool {
+  admin_note: string | null | undefined;
 }
 
 export const SCHOOL_LEVEL_LABELS: Record<SchoolLevel, string> = {

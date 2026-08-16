@@ -2,11 +2,11 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
 import RegistrationTable from '../RegistrationTable';
-import type { RegistrationWithSchool } from '../../../lib/types';
+import type { AdminRegistrationRow } from '../../../lib/types';
 
 function makeRegistration(
-  overrides: Partial<RegistrationWithSchool> = {}
-): RegistrationWithSchool {
+  overrides: Partial<AdminRegistrationRow> = {}
+): AdminRegistrationRow {
   return {
     id: 'reg-1',
     parent_id: 'parent-1',

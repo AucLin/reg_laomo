@@ -116,7 +116,7 @@ describe('listRegistrations', () => {
   it('查詢出錯時回傳空結果而非拋出例外', async () => {
     builder.range.mockResolvedValue({ data: null, count: null, error: { message: '壞了' } });
     const result = await listRegistrations(EMPTY_FILTERS, 0);
-    expect(result).toEqual({ rows: [], total: 0 });
+    expect(result).toEqual({ rows: [], total: 0, notesFailed: false });
   });
 
   // 核心行為：admin_note 不是 registrations_with_school 檢視表本身的欄位
@@ -157,7 +157,14 @@ describe('listRegistrations', () => {
     expect(result.rows[0].admin_note).toBeNull();
   });
 
-  it('備註查詢失敗時主要列表仍然回傳，admin_note 留 null', async () => {
+  // 最終修正三／四：備註查詢失敗時，admin_note 要降級成 undefined、
+  // 不是 null —— null 是「查詢成功、確認沒有備註」，undefined 是
+  // 「這批根本沒讀到，真相未知」。RegistrationDetail 要用這個訊號停用
+  // 備註欄與儲存，避免管理員在不知情的狀態下把真正的備註存空覆蓋掉
+  // （見 RegistrationDetail.test.tsx 的對應測試）。notesFailed 也要
+  // 回報 true，讓呼叫端（匯出）能把失敗訊號帶回畫面，不能只留在
+  // 主控台。
+  it('備註查詢失敗時主要列表仍然回傳，admin_note 降級為 undefined，並回報 notesFailed', async () => {
     builder.range.mockResolvedValue({
       data: [{ id: 'reg-1' }],
       count: 1,
@@ -169,7 +176,10 @@ describe('listRegistrations', () => {
     });
 
     const result = await listRegistrations(EMPTY_FILTERS, 0);
-    expect(result.rows).toEqual([expect.objectContaining({ id: 'reg-1', admin_note: null })]);
+    expect(result.notesFailed).toBe(true);
+    expect(result.rows).toEqual([
+      expect.objectContaining({ id: 'reg-1', admin_note: undefined }),
+    ]);
   });
 
   it('沒有任何列時不會多查一次備註表', async () => {
@@ -206,13 +216,93 @@ describe('listAllForExport', () => {
 
     const result = await listAllForExport(EMPTY_FILTERS);
 
-    expect(result).toEqual([expect.objectContaining({ id: 'reg-1', admin_note: '已致電' })]);
+    expect(result.notesFailed).toBe(false);
+    expect(result.rows).toEqual([
+      expect.objectContaining({ id: 'reg-1', admin_note: '已致電' }),
+    ]);
   });
 
   it('查詢出錯時回傳空陣列', async () => {
     builder.order.mockResolvedValue({ data: null, error: { message: '壞了' } });
     const result = await listAllForExport(EMPTY_FILTERS);
-    expect(result).toEqual([]);
+    expect(result).toEqual({ rows: [], notesFailed: false });
+  });
+
+  // 最終修正三：listAllForExport 不分頁，篩選條件寬鬆時很容易一次帶出
+  // 幾百筆 id。attachNotes 若把全部 id 塞進同一次 .in()，PostgREST 的
+  // GET 查詢字串會超長 —— 複審者對本專案實際端點做過唯讀實測：50～300
+  // 筆都正常，500 筆開始 TypeError: fetch failed，1000／2000 筆直接
+  // Bad Request。修法是把 id 切成每批 200 筆分開查，450 筆會被切成
+  // 200、200、50 三批。
+  it('450 筆 id 分成 3 批查詢（200、200、50），合併結果涵蓋全部', async () => {
+    const ids = Array.from({ length: 450 }, (_, index) => `reg-${index}`);
+    builder.order.mockResolvedValue({
+      data: ids.map((id) => ({ id })),
+      error: null,
+    });
+    notesBuilder.in.mockImplementation((_field: string, batchIds: string[]) =>
+      Promise.resolve({
+        data: batchIds.map((id) => ({ registration_id: id, note: `note-${id}` })),
+        error: null,
+      })
+    );
+
+    const result = await listAllForExport(EMPTY_FILTERS);
+
+    expect(notesBuilder.in).toHaveBeenCalledTimes(3);
+    const batchSizes = notesBuilder.in.mock.calls.map(
+      (call) => (call[1] as string[]).length
+    );
+    expect(batchSizes).toEqual([200, 200, 50]);
+    expect(result.notesFailed).toBe(false);
+    expect(result.rows).toHaveLength(450);
+    expect(result.rows[0]).toEqual(expect.objectContaining({ id: 'reg-0', admin_note: 'note-reg-0' }));
+    expect(result.rows[199]).toEqual(
+      expect.objectContaining({ id: 'reg-199', admin_note: 'note-reg-199' })
+    );
+    expect(result.rows[200]).toEqual(
+      expect.objectContaining({ id: 'reg-200', admin_note: 'note-reg-200' })
+    );
+    expect(result.rows[449]).toEqual(
+      expect.objectContaining({ id: 'reg-449', admin_note: 'note-reg-449' })
+    );
+  });
+
+  // 最終修正三：某一批查詢失敗時，只有那一批的列要降級 —— 不能因為
+  // 一批失敗就把全部已經查成功的備註也一起丟掉；同時要把「這次匯出
+  // 備註不完整」的訊號帶出去（notesFailed），讓 AdminPage 能顯示提示，
+  // 不能只留在主控台的 console.error。
+  it('其中一批查詢失敗時，只有那一批的 admin_note 降級，其餘批仍是真實備註，並回報 notesFailed', async () => {
+    const ids = Array.from({ length: 450 }, (_, index) => `reg-${index}`);
+    builder.order.mockResolvedValue({
+      data: ids.map((id) => ({ id })),
+      error: null,
+    });
+
+    let callCount = 0;
+    notesBuilder.in.mockImplementation((_field: string, batchIds: string[]) => {
+      callCount += 1;
+      if (callCount === 2) {
+        return Promise.resolve({ data: null, error: { message: '壞了' } });
+      }
+      return Promise.resolve({
+        data: batchIds.map((id) => ({ registration_id: id, note: `note-${id}` })),
+        error: null,
+      });
+    });
+
+    const result = await listAllForExport(EMPTY_FILTERS);
+
+    expect(result.notesFailed).toBe(true);
+    // 第一批（第 0～199 筆）成功，維持真實備註
+    expect(result.rows[0].admin_note).toBe('note-reg-0');
+    expect(result.rows[199].admin_note).toBe('note-reg-199');
+    // 第二批（第 200～399 筆）失敗，降級成 undefined（不是 null，
+    // 要跟「確認查無備註」區分開來）
+    expect(result.rows[200].admin_note).toBeUndefined();
+    expect(result.rows[399].admin_note).toBeUndefined();
+    // 第三批（第 400～449 筆）成功，維持真實備註
+    expect(result.rows[400].admin_note).toBe('note-reg-400');
   });
 });
 

@@ -5,8 +5,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import AdminPage from '../AdminPage';
 import * as adminRegistrationsModule from '../../lib/adminRegistrations';
 import * as registrationsModule from '../../lib/registrations';
+import * as csvModule from '../../lib/csv';
 import * as useAuthModule from '../../auth/useAuth';
-import type { RegistrationWithSchool } from '../../lib/types';
+import type { AdminRegistrationRow } from '../../lib/types';
 
 function renderPage() {
   return render(
@@ -17,8 +18,8 @@ function renderPage() {
 }
 
 function makeRegistration(
-  overrides: Partial<RegistrationWithSchool> = {}
-): RegistrationWithSchool {
+  overrides: Partial<AdminRegistrationRow> = {}
+): AdminRegistrationRow {
   return {
     id: 'reg-1',
     parent_id: 'parent-1',
@@ -75,7 +76,7 @@ describe('AdminPage', () => {
     const user = userEvent.setup();
     const listSpy = vi
       .spyOn(adminRegistrationsModule, 'listRegistrations')
-      .mockResolvedValue({ rows: [makeRegistration()], total: 1 });
+      .mockResolvedValue({ rows: [makeRegistration()], total: 1, notesFailed: false });
     vi.spyOn(registrationsModule, 'updateRegistrationStatus').mockResolvedValue({
       error: '更新失敗，請稍後再試',
     });
@@ -103,7 +104,7 @@ describe('AdminPage', () => {
     const user = userEvent.setup();
     const listSpy = vi
       .spyOn(adminRegistrationsModule, 'listRegistrations')
-      .mockResolvedValue({ rows: [makeRegistration()], total: 1 });
+      .mockResolvedValue({ rows: [makeRegistration()], total: 1, notesFailed: false });
     vi.spyOn(registrationsModule, 'updateRegistrationStatus').mockResolvedValue({
       error: null,
     });
@@ -119,5 +120,57 @@ describe('AdminPage', () => {
     expect(await screen.findByText('報名管理')).toBeInTheDocument();
     expect(screen.queryByText('報名明細')).not.toBeInTheDocument();
     expect(listSpy).toHaveBeenCalledTimes(2);
+  });
+
+  // 最終修正三：listAllForExport 不分頁，資料量大時 attachNotes() 的
+  // .in() 可能整批失敗，備註查詢失敗的降級處理過去只留一行
+  // console.error，CSV 的備註欄會靜默全空、行政人員拿到檔案完全看不出
+  // 異狀。這裡改成把失敗訊號帶回畫面，用跟撤回／存檔失敗一致的
+  // role="alert" 呈現，不能只留在主控台。
+  it('匯出時備註讀取失敗要在畫面顯示提示，不能只留在主控台', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(adminRegistrationsModule, 'listRegistrations').mockResolvedValue({
+      rows: [],
+      total: 0,
+      notesFailed: false,
+    });
+    vi.spyOn(adminRegistrationsModule, 'listAllForExport').mockResolvedValue({
+      rows: [makeRegistration()],
+      notesFailed: true,
+    });
+    vi.spyOn(csvModule, 'downloadCsv').mockImplementation(() => {});
+
+    renderPage();
+    await screen.findByText('報名管理');
+
+    await user.click(screen.getByRole('button', { name: /匯出 CSV/ }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      '本次備註讀取失敗，匯出的備註欄可能不完整'
+    );
+    // 主要資料還是要照樣匯出，不能因為備註失敗整份檔案都不下載
+    expect(csvModule.downloadCsv).toHaveBeenCalledTimes(1);
+  });
+
+  it('匯出時備註讀取成功則不顯示任何警示', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(adminRegistrationsModule, 'listRegistrations').mockResolvedValue({
+      rows: [],
+      total: 0,
+      notesFailed: false,
+    });
+    vi.spyOn(adminRegistrationsModule, 'listAllForExport').mockResolvedValue({
+      rows: [makeRegistration()],
+      notesFailed: false,
+    });
+    vi.spyOn(csvModule, 'downloadCsv').mockImplementation(() => {});
+
+    renderPage();
+    await screen.findByText('報名管理');
+
+    await user.click(screen.getByRole('button', { name: /匯出 CSV/ }));
+
+    expect(csvModule.downloadCsv).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });

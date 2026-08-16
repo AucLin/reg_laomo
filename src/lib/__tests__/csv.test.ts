@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { toCsv } from '../csv';
-import type { RegistrationWithSchool } from '../types';
+import type { AdminRegistrationRow } from '../types';
 
 function makeRegistration(
-  overrides: Partial<RegistrationWithSchool> = {}
-): RegistrationWithSchool {
+  overrides: Partial<AdminRegistrationRow> = {}
+): AdminRegistrationRow {
   return {
     id: 'reg-1',
     parent_id: 'parent-1',

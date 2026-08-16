@@ -125,7 +125,6 @@ describe('ApplyPage', () => {
       relation: 'father',
       contact_phone: '0912345678',
       status: 'pending',
-      admin_note: null,
       created_at: '2026-08-10T10:00:00Z',
       updated_at: '2026-08-10T10:00:00Z',
       school_name: '臺北市立中正國小',

@@ -1,12 +1,30 @@
 import { supabase } from './supabase';
 import {
   DEFAULT_CITIES,
+  type AdminRegistrationRow,
   type RegistrationStatus,
   type RegistrationWithSchool,
   type SchoolLevel,
 } from './types';
 
 export const PAGE_SIZE = 25;
+
+/**
+ * registration_notes 只用 registration_id 查詢，一次塞太多 id 進
+ * .in() 會讓 PostgREST 的 GET 查詢字串超長。複審者對本專案實際端點
+ * 做過唯讀實測：50～300 筆 id 都正常，500 筆開始 TypeError: fetch
+ * failed，1000／2000 筆直接 Bad Request。200 留在安全邊界內、離
+ * 500 這個實測失敗點還有一倍緩衝。
+ */
+const NOTES_BATCH_SIZE = 200;
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let start = 0; start < items.length; start += size) {
+    chunks.push(items.slice(start, start + size));
+  }
+  return chunks;
+}
 
 export interface AdminFilters {
   level: SchoolLevel | '';
@@ -95,40 +113,63 @@ function buildBaseQuery(withCount: boolean) {
  * registrations_with_school 檢視表時，天生連 admin_note 這個鍵都不會
  * 出現在查詢結果裡，不必依賴「前端不要印出來」這種擋不住自己構造請求
  * 的防線。
+ *
+ * id 數量可能超過安全邊界（見 NOTES_BATCH_SIZE 的註解），所以切成每批
+ * 200 筆分開查詢、平行送出再合併。某一批失敗時只有那一批的列要降級，
+ * 不能因為一批失敗就把其他批已經查成功的真實備註也一起丟掉；同時用
+ * admin_note: undefined（不是 null）標記「這批沒讀到」，null 留給
+ * 「確認查無備註」，讓下游（RegistrationDetail）分得出兩者的差異 ——
+ * 前者不能讓管理員在不知情的狀態下存檔覆蓋，後者可以正常編輯。
+ * notesFailed 則是「這次呼叫是否至少有一批失敗」的總旗標，給呼叫端
+ * （目前是匯出）決定要不要在畫面上顯示警示，不能只留一行 console.error
+ * 在主控台，管理員完全看不到。
  */
 async function attachNotes(
   rows: RegistrationWithSchool[]
-): Promise<RegistrationWithSchool[]> {
-  if (rows.length === 0) return rows;
+): Promise<{ rows: AdminRegistrationRow[]; notesFailed: boolean }> {
+  if (rows.length === 0) return { rows: [], notesFailed: false };
 
-  const { data, error } = await supabase
-    .from('registration_notes')
-    .select('registration_id, note')
-    .in(
-      'registration_id',
-      rows.map((row) => row.id)
-    );
-
-  if (error) {
-    console.error('讀取內部備註失敗：', error.message);
-    // 備註查詢失敗不該讓整份報名列表跟著消失 —— 主要資料仍然可用，
-    // 只是這一輪備註留白，比整頁空白對行政人員有用得多。
-    return rows.map((row) => ({ ...row, admin_note: null }));
-  }
-
-  const noteByRegistrationId = new Map(
-    (data ?? []).map((item) => [item.registration_id as string, item.note as string | null])
+  const idBatches = chunk(
+    rows.map((row) => row.id),
+    NOTES_BATCH_SIZE
   );
-  return rows.map((row) => ({
+
+  const batchResults = await Promise.all(
+    idBatches.map((ids) =>
+      supabase.from('registration_notes').select('registration_id, note').in('registration_id', ids)
+    )
+  );
+
+  const noteByRegistrationId = new Map<string, string | null>();
+  const failedIds = new Set<string>();
+  let notesFailed = false;
+
+  batchResults.forEach(({ data, error }, index) => {
+    if (error) {
+      console.error('讀取內部備註失敗：', error.message);
+      notesFailed = true;
+      for (const id of idBatches[index]) failedIds.add(id);
+      return;
+    }
+    for (const item of data ?? []) {
+      noteByRegistrationId.set(item.registration_id as string, item.note as string | null);
+    }
+  });
+
+  const mergedRows: AdminRegistrationRow[] = rows.map((row) => ({
     ...row,
-    admin_note: noteByRegistrationId.get(row.id) ?? null,
+    admin_note: failedIds.has(row.id)
+      ? undefined
+      : noteByRegistrationId.get(row.id) ?? null,
   }));
+
+  return { rows: mergedRows, notesFailed };
 }
 
 export async function listRegistrations(
   filters: AdminFilters,
   page: number
-): Promise<{ rows: RegistrationWithSchool[]; total: number }> {
+): Promise<{ rows: AdminRegistrationRow[]; total: number; notesFailed: boolean }> {
   const query = applyFilters(buildBaseQuery(true), filters);
 
   const from = page * PAGE_SIZE;
@@ -138,23 +179,23 @@ export async function listRegistrations(
 
   if (error) {
     console.error('讀取報名列表失敗：', error.message);
-    return { rows: [], total: 0 };
+    return { rows: [], total: 0, notesFailed: false };
   }
 
-  const rows = await attachNotes((data ?? []) as RegistrationWithSchool[]);
-  return { rows, total: count ?? 0 };
+  const { rows, notesFailed } = await attachNotes((data ?? []) as RegistrationWithSchool[]);
+  return { rows, total: count ?? 0, notesFailed };
 }
 
 /** 匯出用：不分頁，取全部符合條件的資料 */
 export async function listAllForExport(
   filters: AdminFilters
-): Promise<RegistrationWithSchool[]> {
+): Promise<{ rows: AdminRegistrationRow[]; notesFailed: boolean }> {
   const query = applyFilters(buildBaseQuery(false), filters);
   const { data, error } = await query.order('created_at', { ascending: false });
 
   if (error) {
     console.error('匯出查詢失敗：', error.message);
-    return [];
+    return { rows: [], notesFailed: false };
   }
   return attachNotes((data ?? []) as RegistrationWithSchool[]);
 }

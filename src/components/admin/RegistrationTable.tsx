@@ -1,9 +1,9 @@
 import StatusBadge from '../StatusBadge';
-import { formatGrade, type RegistrationWithSchool } from '../../lib/types';
+import { formatGrade, type AdminRegistrationRow } from '../../lib/types';
 
 interface Props {
-  rows: RegistrationWithSchool[];
-  onSelect: (registration: RegistrationWithSchool) => void;
+  rows: AdminRegistrationRow[];
+  onSelect: (registration: AdminRegistrationRow) => void;
 }
 
 export default function RegistrationTable({ rows, onSelect }: Props) {

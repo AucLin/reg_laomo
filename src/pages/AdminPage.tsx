@@ -15,12 +15,12 @@ import {
 } from '../lib/adminRegistrations';
 import { updateRegistrationStatus } from '../lib/registrations';
 import { downloadCsv, toCsv } from '../lib/csv';
-import type { RegistrationStatus, RegistrationWithSchool } from '../lib/types';
+import type { AdminRegistrationRow, RegistrationStatus } from '../lib/types';
 
 export default function AdminPage() {
   const [filters, setFilters] = useState<AdminFilters>(EMPTY_FILTERS);
   const [page, setPage] = useState(0);
-  const [rows, setRows] = useState<RegistrationWithSchool[]>([]);
+  const [rows, setRows] = useState<AdminRegistrationRow[]>([]);
   const [total, setTotal] = useState(0);
   const [stats, setStats] = useState({
     thisMonth: 0,
@@ -28,9 +28,13 @@ export default function AdminPage() {
     contacted: 0,
     enrolled: 0,
   });
-  const [selected, setSelected] = useState<RegistrationWithSchool | null>(null);
+  const [selected, setSelected] = useState<AdminRegistrationRow | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  // 匯出時 attachNotes() 若有任何一批備註查詢失敗，要讓管理員在畫面上
+  // 看得到，不能只留一行 console.error 在主控台 —— 見 listAllForExport
+  // 的 notesFailed。
+  const [exportWarning, setExportWarning] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -56,7 +60,7 @@ export default function AdminPage() {
 
   // 點開新的一筆或關掉明細時，把上一筆留下的錯誤訊息清掉 ——
   // 不然改完 A 筆失敗，關掉後點開 B 筆，B 筆會莫名其妙先看到 A 筆的錯誤。
-  function handleSelect(registration: RegistrationWithSchool) {
+  function handleSelect(registration: AdminRegistrationRow) {
     setSaveError(null);
     setSelected(registration);
   }
@@ -86,9 +90,14 @@ export default function AdminPage() {
 
   async function handleExport() {
     // 匯出的是目前篩選條件下的全部資料，不是當頁的 25 筆
-    const all = await listAllForExport(filters);
+    const { rows: all, notesFailed } = await listAllForExport(filters);
     const stamp = new Date().toISOString().slice(0, 10);
     downloadCsv(toCsv(all), `老莫報名資料_${stamp}.csv`);
+    // 主要資料照樣匯出，不因為備註查詢失敗就整份檔案都不下載 ——
+    // 只是要讓管理員知道這次的備註欄可能不完整，不能只留在主控台。
+    setExportWarning(
+      notesFailed ? '本次備註讀取失敗，匯出的備註欄可能不完整' : null
+    );
   }
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -108,6 +117,18 @@ export default function AdminPage() {
             匯出 CSV
           </button>
         </div>
+
+        {/* 匯出時備註讀取失敗要在畫面顯示，不能只留在主控台的
+            console.error —— 行政人員完全不知道 CSV 的備註欄其實不完整。
+            用跟撤回／存檔失敗一致的 role="alert" 呈現。 */}
+        {exportWarning && (
+          <p
+            role="alert"
+            className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
+          >
+            {exportWarning}
+          </p>
+        )}
 
         <div className="mt-6">
           <StatsCards stats={stats} />

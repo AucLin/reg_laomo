@@ -12,6 +12,7 @@ export default function MyRegistrationsPage() {
   const [loading, setLoading] = useState(true);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [errorId, setErrorId] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     listMyRegistrations()
@@ -21,20 +22,26 @@ export default function MyRegistrationsPage() {
 
   function handleStartConfirm(id: string) {
     setErrorId(null);
+    setErrorMessage(null);
     setConfirmingId(id);
   }
 
   async function handleDelete(id: string) {
     const { error } = await deleteRegistration(id);
     if (error) {
-      // 撤回被資料庫的列級權限擋下，通常是這筆報名剛好已被行政端
-      // 處理過。重新抓一次清單，讓畫面狀態跟資料庫同步，家長才會
-      // 看到這筆報名其實已經不是待審核，而不是悄悄退回原狀。
+      // deleteRegistration() 現在會回傳兩種語意不同的訊息：被列級權限
+      // 擋下（這筆報名已進入處理流程）跟真正的資料庫錯誤（撤回失敗，
+      // 請稍後再試）。過去這裡不管收到哪一種都寫死同一句「已進入處理
+      // 流程」，資料庫錯誤那種情況會誤導家長去問中心「這筆到底處理到
+      // 哪」，其實只是網路或伺服器暫時出狀況、稍後重試就好。直接顯示
+      // error 本身的內容，讓畫面上的訊息跟資料層實際回傳的一致。
       setErrorId(id);
+      setErrorMessage(error);
       const fresh = await listMyRegistrations();
       setRegistrations(fresh);
     } else {
       setErrorId(null);
+      setErrorMessage(null);
       setRegistrations((current) => current.filter((item) => item.id !== id));
     }
     setConfirmingId(null);
@@ -117,16 +124,18 @@ export default function MyRegistrationsPage() {
                 {new Date(registration.created_at).toLocaleString('zh-TW')}
               </p>
 
-              {/* 撤回失敗多半是這筆報名剛好已被行政端處理過，資料庫的
-                  列級權限擋下了刪除。不論卡片之後顯示哪種狀態，這則
-                  錯誤訊息都要露出，家長才知道剛剛按的那次撤回發生了
-                  什麼事。 */}
-              {errorId === registration.id && (
+              {/* 撤回失敗可能是這筆報名剛好已被行政端處理過（列級權限
+                  擋下），也可能是單純的資料庫錯誤 —— 兩種情況資料層回傳
+                  的訊息不同，這裡直接顯示 error 本身的內容，不再寫死同
+                  一句話蓋掉真正的錯誤原因。不論卡片之後顯示哪種狀態，
+                  這則錯誤訊息都要露出，家長才知道剛剛按的那次撤回發生
+                  了什麼事。 */}
+              {errorId === registration.id && errorMessage && (
                 <p
                   role="alert"
                   className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
                 >
-                  這筆報名已進入處理流程，無法撤回，請聯絡中心
+                  {errorMessage}
                 </p>
               )}
 

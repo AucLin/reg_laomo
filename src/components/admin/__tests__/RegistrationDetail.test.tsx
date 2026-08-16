@@ -2,9 +2,9 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi } from 'vitest';
 import RegistrationDetail from '../RegistrationDetail';
-import type { RegistrationWithSchool } from '../../../lib/types';
+import type { AdminRegistrationRow } from '../../../lib/types';
 
-const registration: RegistrationWithSchool = {
+const registration: AdminRegistrationRow = {
   id: 'reg-1',
   parent_id: 'parent-1',
   student_name: '林小明',
@@ -212,5 +212,49 @@ describe('RegistrationDetail', () => {
     );
 
     expect(screen.getByLabelText('內部備註')).toHaveAccessibleDescription('家長看不到');
+  });
+
+  // 最終修正四：備註分表後，attachNotes() 查詢失敗時 admin_note 會降級
+  // 成 undefined（不是 null——null 代表「確認查無備註」，undefined 代表
+  // 「這批根本沒讀到」）。這個狀態下備註框若照常顯示空字串、管理員又
+  // 按了儲存，updateRegistrationStatus 會把空字串轉成 null upsert 回去，
+  // 真正的備註就這樣被覆蓋掉、還無跡可尋。備註欄與儲存都要停用，並且
+  // 明確提示，不能讓管理員在不知情的狀態下把備註存空。
+  it('admin_note 為 undefined（備註讀取失敗）時停用備註欄與儲存，避免不知情覆蓋真實備註', async () => {
+    const onSaved = vi.fn().mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    render(
+      <RegistrationDetail
+        registration={{ ...registration, admin_note: undefined }}
+        onClose={vi.fn()}
+        onSaved={onSaved}
+      />
+    );
+
+    const noteInput = screen.getByLabelText('內部備註') as HTMLTextAreaElement;
+    const saveButton = screen.getByRole('button', { name: '儲存' });
+
+    expect(noteInput).toBeDisabled();
+    expect(saveButton).toBeDisabled();
+    expect(screen.getByRole('alert')).toHaveTextContent('備註讀取失敗');
+
+    // 就算按鈕被禁用，userEvent 的點擊也不會真的觸發，這裡再明確斷言
+    // onSaved 從未被呼叫，確保沒有任何路徑能在這個狀態下把備註存回去
+    await user.click(saveButton);
+    expect(onSaved).not.toHaveBeenCalled();
+  });
+
+  it('admin_note 為 null（確認查無備註）時備註欄與儲存維持正常可用', () => {
+    render(
+      <RegistrationDetail
+        registration={{ ...registration, admin_note: null }}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+      />
+    );
+
+    expect(screen.getByLabelText('內部備註')).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: '儲存' })).not.toBeDisabled();
+    expect(screen.queryByText('備註讀取失敗')).not.toBeInTheDocument();
   });
 });
