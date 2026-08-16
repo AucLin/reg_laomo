@@ -5,9 +5,10 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ApplyPage from './pages/ApplyPage';
 import MyRegistrationsPage from './pages/MyRegistrationsPage';
+import AdminPage from './pages/AdminPage';
 
 // 以下頁面會在後續任務建立，先用暫時內容佔位，讓路由結構先跑起來。
-// Task 17 換成 AdminPage、Task 19 換成 LandingPage。
+// Task 19 換成 LandingPage。
 function Placeholder({ title }: { title: string }) {
   return <div className="p-8">{title}</div>;
 }
@@ -40,7 +41,7 @@ export default function App() {
             path="/admin"
             element={
               <AdminRoute>
-                <Placeholder title="後台管理" />
+                <AdminPage />
               </AdminRoute>
             }
           />

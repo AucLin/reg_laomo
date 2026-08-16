@@ -10,19 +10,26 @@ import { useRef, type ChangeEvent, type CompositionEvent } from 'react';
  * 全站共用的中文輸入欄位守衛。原本只在 ApplyPage.tsx 裡（學生姓名、班級、
  * 家長姓名三個欄位共用），後台 RegistrationFilters.tsx 的搜尋框加入後
  * 抽成這個共用 hook，避免每個中文輸入框各自重寫一份。
+ *
+ * 泛型參數預設為 HTMLInputElement，維持既有呼叫點（單行輸入框）不變；
+ * RegistrationDetail.tsx 的內部備註是 <textarea>，呼叫時指定
+ * useImeGuardedInput<HTMLTextAreaElement> 即可沿用同一份邏輯，
+ * 不需要另外寫一份給多行輸入框的版本。
  */
-export function useImeGuardedInput(setValue: (value: string) => void) {
+export function useImeGuardedInput<T extends HTMLInputElement | HTMLTextAreaElement = HTMLInputElement>(
+  setValue: (value: string) => void
+) {
   const isComposingRef = useRef(false);
 
   return {
-    onChange: (event: ChangeEvent<HTMLInputElement>) => {
+    onChange: (event: ChangeEvent<T>) => {
       if (isComposingRef.current) return;
       setValue(event.target.value);
     },
     onCompositionStart: () => {
       isComposingRef.current = true;
     },
-    onCompositionEnd: (event: CompositionEvent<HTMLInputElement>) => {
+    onCompositionEnd: (event: CompositionEvent<T>) => {
       isComposingRef.current = false;
       setValue(event.currentTarget.value);
     },

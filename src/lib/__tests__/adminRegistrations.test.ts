@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { listRegistrations, EMPTY_FILTERS, PAGE_SIZE } from '../adminRegistrations';
+import { listRegistrations, EMPTY_FILTERS, PAGE_SIZE, getStats } from '../adminRegistrations';
 
 const builder = {
   select: vi.fn(),
@@ -10,8 +10,19 @@ const builder = {
   range: vi.fn(),
 };
 
+// getStats 查詢的是 registrations 原表（不是 registrations_with_school 檢視表），
+// 用另一個 builder 區分開來，不然它的 .eq()／.gte() 會跟 listRegistrations
+// 那組互相干擾（同一個 mock 函式在兩邊被賦予不同的回傳型態）。
+const statsBuilder = {
+  select: vi.fn(),
+  eq: vi.fn(),
+  gte: vi.fn(),
+};
+
 vi.mock('../supabase', () => ({
-  supabase: { from: () => builder },
+  supabase: {
+    from: (table: string) => (table === 'registrations' ? statsBuilder : builder),
+  },
 }));
 
 describe('listRegistrations', () => {
@@ -67,5 +78,40 @@ describe('listRegistrations', () => {
     builder.range.mockResolvedValue({ data: null, count: null, error: { message: '壞了' } });
     const result = await listRegistrations(EMPTY_FILTERS, 0);
     expect(result).toEqual({ rows: [], total: 0 });
+  });
+});
+
+describe('getStats', () => {
+  beforeEach(() => {
+    for (const key of Object.keys(statsBuilder) as (keyof typeof statsBuilder)[]) {
+      statsBuilder[key].mockReset();
+    }
+    statsBuilder.select.mockReturnValue(statsBuilder);
+  });
+
+  it('四個計數各自呼叫正確的 .eq()／.gte() 條件', async () => {
+    statsBuilder.eq.mockResolvedValue({ count: 1, error: null });
+    statsBuilder.gte.mockResolvedValue({ count: 4, error: null });
+
+    const result = await getStats();
+
+    expect(statsBuilder.eq).toHaveBeenCalledWith('status', 'pending');
+    expect(statsBuilder.eq).toHaveBeenCalledWith('status', 'contacted');
+    expect(statsBuilder.eq).toHaveBeenCalledWith('status', 'enrolled');
+    expect(statsBuilder.gte).toHaveBeenCalledWith('created_at', expect.any(String));
+    expect(result).toEqual({ thisMonth: 4, pending: 1, contacted: 1, enrolled: 1 });
+  });
+
+  it('其中一個查詢失敗時仍回傳其餘可用值', async () => {
+    statsBuilder.eq.mockImplementation((_field: string, status: string) =>
+      status === 'contacted'
+        ? Promise.resolve({ count: null, error: { message: '壞了' } })
+        : Promise.resolve({ count: 3, error: null })
+    );
+    statsBuilder.gte.mockResolvedValue({ count: 7, error: null });
+
+    const result = await getStats();
+
+    expect(result).toEqual({ thisMonth: 7, pending: 3, contacted: 0, enrolled: 3 });
   });
 });
