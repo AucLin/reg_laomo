@@ -24,7 +24,7 @@ const HEADERS = [
 
 /** 含逗號、雙引號或換行的欄位必須用雙引號包住，內部的雙引號要重複一次 */
 function escapeField(value: string): string {
-  if (/[",\n\r，]/.test(value)) {
+  if (/[",\n\r]/.test(value)) {
     return `"${value.replace(/"/g, '""')}"`;
   }
   return value;

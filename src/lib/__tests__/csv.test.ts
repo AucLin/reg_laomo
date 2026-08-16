@@ -53,8 +53,8 @@ describe('toCsv', () => {
   });
 
   it('含逗號的欄位用雙引號包起來', () => {
-    const csv = toCsv([makeRegistration({ admin_note: '已致電，家長要求週末回覆' })]);
-    expect(csv).toContain('"已致電，家長要求週末回覆"');
+    const csv = toCsv([makeRegistration({ admin_note: '已致電,家長要求週末回覆' })]);
+    expect(csv).toContain('"已致電,家長要求週末回覆"');
   });
 
   it('欄位內的雙引號改成兩個雙引號', () => {
@@ -78,10 +78,30 @@ describe('toCsv', () => {
   it('空值輸出成空字串而不是 null 字樣', () => {
     const csv = toCsv([makeRegistration({ class_name: null, admin_note: null })]);
     expect(csv).not.toContain('null');
+    // 精準檢查：班級欄位與備註欄位應為空
+    const lines = csv.replace('﻿', '').split('\n');
+    const dataRow = lines[1]; // 第二行是資料
+    const fields = dataRow.split(',');
+    // 班級是第 8 個欄位（索引 7），備註是第 13 個欄位（索引 12）
+    expect(fields[7]).toBe('');
+    expect(fields[12]).toBe('');
   });
 
   it('沒有資料時仍輸出標題列', () => {
     const csv = toCsv([]);
     expect(csv.replace('﻿', '').split('\n')[0]).toContain('學生姓名');
+  });
+
+  it('含換行符的欄位用雙引號包起來', () => {
+    const csv = toCsv([makeRegistration({ admin_note: '第一行\n第二行' })]);
+    expect(csv).toContain('"第一行\n第二行"');
+  });
+
+  it('全形逗號在 CSV 是普通字元，不會被引號包住', () => {
+    const csv = toCsv([makeRegistration({ admin_note: '已致電，沒人接' })]);
+    // 全形逗號（U+FF0C）不是 CSV 分隔符，所以不需要跳脫
+    // 這個欄位應該原樣出現，不含引號
+    expect(csv).toContain('已致電，沒人接');
+    expect(csv).not.toContain('"已致電，沒人接"');
   });
 });
