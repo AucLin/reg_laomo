@@ -82,7 +82,12 @@ export default function MyRegistrationsPage() {
                 </h2>
                 <p className="mt-1 text-sm text-slate-600">
                   {registration.school_name ?? registration.school_name_raw}
-                  {!registration.school_id && (
+                  {/* 用 school_name（而非 school_id）判斷要不要顯示待確認標記：
+                      school_id 有值不代表校名一定解析得出來 —— 學校名錄
+                      的讀取政策限定 is_active = true，若那所學校事後被
+                      停用，左連接會查無資料、school_name 一樣變 null，
+                      這批報名同樣需要人工確認是哪所學校 */}
+                  {!registration.school_name && (
                     <span className="ml-2 rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-800">
                       學校待確認
                     </span>

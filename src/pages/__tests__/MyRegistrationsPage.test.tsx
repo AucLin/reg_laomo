@@ -119,6 +119,26 @@ describe('MyRegistrationsPage', () => {
     expect(screen.getByText('學校待確認')).toBeInTheDocument();
   });
 
+  // school_id 有值（家長確實選了名錄裡的學校），但該校後來被下架
+  // （is_active = false），schools 的讀取政策擋下、左連接查無資料，
+  // school_name 一樣變 null。這批報名跟自由填寫校名一樣需要人工確認，
+  // 不能因為 school_id 有值就不顯示待確認標記。
+  it('school_id 有值但學校已被停用（school_name 為 null）時仍顯示待確認標記', async () => {
+    vi.spyOn(registrationsModule, 'listMyRegistrations').mockResolvedValue([
+      makeRegistration({
+        school_id: 'school-inactive',
+        school_name_raw: null,
+        school_name: null,
+        school_city: null,
+        school_level: null,
+      }),
+    ]);
+    renderPage();
+
+    await screen.findByText('林小明');
+    expect(screen.getByText('學校待確認')).toBeInTheDocument();
+  });
+
   it('多筆待審核報名的撤回確認各自獨立，點一筆不影響另一筆', async () => {
     const user = userEvent.setup();
     vi.spyOn(registrationsModule, 'listMyRegistrations').mockResolvedValue([

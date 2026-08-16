@@ -190,20 +190,71 @@ async function main() {
     `實際看到 ${(adminSees ?? []).length} 筆`
   );
 
-  // 同上：「管理員可以改狀態與內部備註」也要讀回資料庫確認，不能只看 error 是否為 null。
-  const { error: noteError } = await parentB.client
+  // 內部備註已經拆到獨立的 registration_notes 表（見
+  // 20260817100000_split_admin_note_to_registration_notes.sql），不再是
+  // registrations 的欄位。狀態與備註因此分兩次寫入，同上：「應成功」也要
+  // 讀回資料庫確認，不能只看 error 是否為 null。
+  const { error: statusOnlyError } = await parentB.client
     .from('registrations')
-    .update({ status: 'contacted', admin_note: '已致電' })
+    .update({ status: 'contacted' })
     .eq('id', created!.id);
-  const { data: afterNote } = await admin
+  const { error: noteError } = await parentB.client
+    .from('registration_notes')
+    .upsert({ registration_id: created!.id, note: '已致電' });
+  const { data: afterStatusOnly } = await admin
     .from('registrations')
-    .select('status, admin_note')
+    .select('status')
     .eq('id', created!.id)
+    .single();
+  const { data: afterNote } = await admin
+    .from('registration_notes')
+    .select('note')
+    .eq('registration_id', created!.id)
     .single();
   check(
     '管理員可以改狀態與內部備註',
-    noteError === null && afterNote?.status === 'contacted' && afterNote?.admin_note === '已致電',
-    `錯誤：${noteError?.message ?? '（無）'}／資料庫實際狀態：${afterNote?.status}／備註：${afterNote?.admin_note}`
+    statusOnlyError === null &&
+      noteError === null &&
+      afterStatusOnly?.status === 'contacted' &&
+      afterNote?.note === '已致電',
+    `狀態錯誤：${statusOnlyError?.message ?? '（無）'}／備註錯誤：${noteError?.message ?? '（無）'}／` +
+      `資料庫實際狀態：${afterStatusOnly?.status}／備註：${afterNote?.note}`
+  );
+
+  // 核心防線：內部備註表只開放 is_admin() 的列級權限，家長（parentA，
+  // 這筆報名真正的擁有者）完全沒有任何政策，連自己那筆報名的備註都
+  // 讀不到、寫不進去 —— 不是靠前端不選這個欄位擋，是資料庫層真的擋下。
+  const { data: parentReadsNote } = await parentA.client
+    .from('registration_notes')
+    .select('note')
+    .eq('registration_id', created!.id);
+  check(
+    '家長讀不到自己報名的內部備註',
+    (parentReadsNote ?? []).length === 0,
+    `實際看到 ${(parentReadsNote ?? []).length} 筆`
+  );
+
+  const { data: parentWritesNote } = await parentA.client
+    .from('registration_notes')
+    .upsert({ registration_id: created!.id, note: '家長自己寫的備註' })
+    .select();
+  check(
+    '家長寫不進自己報名的內部備註',
+    (parentWritesNote ?? []).length === 0,
+    `UPSERT 回傳 ${(parentWritesNote ?? []).length} 筆`
+  );
+
+  // 最直接的驗證：家長用自己的 access token 查一次自己的報名，確認
+  // 回應物件裡真的沒有 admin_note 這個鍵，不是「有欄位但值是 null」。
+  const { data: parentOwnRegistration } = await parentA.client
+    .from('registrations_with_school')
+    .select('*')
+    .eq('id', created!.id)
+    .single();
+  check(
+    '家長查自己的報名時，回應裡沒有 admin_note 欄位',
+    !!parentOwnRegistration && !('admin_note' in parentOwnRegistration),
+    `回應鍵：${parentOwnRegistration ? Object.keys(parentOwnRegistration).join('、') : '（查無資料）'}`
   );
 
   const { error: tamperError } = await parentB.client

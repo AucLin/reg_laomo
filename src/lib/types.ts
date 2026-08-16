@@ -36,8 +36,17 @@ export interface Registration {
   relation: Relation;
   contact_phone: string;
   status: RegistrationStatus;
-  admin_note: string | null;
   created_at: string;
+  updated_at: string;
+}
+
+/**
+ * 內部備註，對應獨立的 registration_notes 表（只有管理員讀得到，
+ * 見 supabase/migrations/20260817100000_split_admin_note_to_registration_notes.sql）。
+ */
+export interface RegistrationNote {
+  registration_id: string;
+  note: string | null;
   updated_at: string;
 }
 
@@ -45,11 +54,19 @@ export interface Registration {
  * 報名資料附帶學校名稱，對應資料庫的 registrations_with_school 檢視表。
  * 學校欄位是左連接來的，所以「找不到我的學校」那類報名這三個欄位會是 null，
  * 顯示時要退回 school_name_raw。
+ *
+ * admin_note 不是這張檢視表本身的欄位（它已經拆到 registration_notes、
+ * 只開放 is_admin() 的列級權限，家長端完全查不到）。這裡把它列在型別上
+ * 是給「管理員後台合併過備註的列」用的 —— adminRegistrations.ts 的
+ * listRegistrations／listAllForExport 會額外查一次 registration_notes
+ * 再合併進來；家長端（getRegistration／listMyRegistrations）讀到的物件
+ * 天生就沒有這個鍵，不受影響，因為那兩支查詢從未合併過備註。
  */
 export interface RegistrationWithSchool extends Registration {
   school_name: string | null;
   school_city: string | null;
   school_level: SchoolLevel | null;
+  admin_note: string | null;
 }
 
 export const SCHOOL_LEVEL_LABELS: Record<SchoolLevel, string> = {

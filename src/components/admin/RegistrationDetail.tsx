@@ -67,7 +67,10 @@ export default function RegistrationDetail({
           <Item
             label="就讀學校"
             value={registration.school_name ?? registration.school_name_raw ?? ''}
-            badge={!registration.school_id ? '學校待人工確認' : undefined}
+            // 用 school_name 而非 school_id 判斷：school_id 有值不代表校名
+            // 解析得出來 —— 該校若被下架（is_active = false），左連接會
+            // 查無資料、school_name 一樣變 null，這批報名同樣需要人工確認
+            badge={!registration.school_name ? '學校待人工確認' : undefined}
           />
           <Item label="年級" value={formatGrade(registration.grade)} />
           <Item label="班級" value={registration.class_name ?? '未填'} />

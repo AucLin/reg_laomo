@@ -31,7 +31,9 @@ export default function RegistrationTable({ rows, onSelect }: Props) {
                   <p className="font-semibold text-slate-900">{row.student_name}</p>
                   <p className="mt-1 text-sm text-slate-600">
                     {row.school_name ?? row.school_name_raw}
-                    {!row.school_id && (
+                    {/* 用 school_name 判斷，不是 school_id：school_id 有值
+                        不代表校名解析得出來，該校若被停用一樣需要人工確認 */}
+                    {!row.school_name && (
                       <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800">
                         待確認
                       </span>
@@ -77,7 +79,7 @@ export default function RegistrationTable({ rows, onSelect }: Props) {
                 </td>
                 <td className="px-4 py-3 text-slate-600">
                   {row.school_name ?? row.school_name_raw}
-                  {!row.school_id && (
+                  {!row.school_name && (
                     <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800">
                       待確認
                     </span>

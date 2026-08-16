@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { listRegistrations, EMPTY_FILTERS, PAGE_SIZE, getStats } from '../adminRegistrations';
+import {
+  listRegistrations,
+  listAllForExport,
+  EMPTY_FILTERS,
+  PAGE_SIZE,
+  getStats,
+} from '../adminRegistrations';
 
 const builder = {
   select: vi.fn(),
@@ -19,9 +25,21 @@ const statsBuilder = {
   gte: vi.fn(),
 };
 
+// 內部備註已拆到獨立的 registration_notes 表，attachNotes() 會另外查一次
+// 這張表再合併回結果列，用第三個 builder 隔開，避免跟主查詢／統計查詢的
+// mock 互相干擾。
+const notesBuilder = {
+  select: vi.fn(),
+  in: vi.fn(),
+};
+
 vi.mock('../supabase', () => ({
   supabase: {
-    from: (table: string) => (table === 'registrations' ? statsBuilder : builder),
+    from: (table: string) => {
+      if (table === 'registrations') return statsBuilder;
+      if (table === 'registration_notes') return notesBuilder;
+      return builder;
+    },
   },
 }));
 
@@ -32,18 +50,39 @@ describe('listRegistrations', () => {
       builder[key].mockReturnValue(builder);
     }
     builder.range.mockResolvedValue({ data: [], count: 0, error: null });
+
+    for (const key of Object.keys(notesBuilder) as (keyof typeof notesBuilder)[]) {
+      notesBuilder[key].mockReset();
+      notesBuilder[key].mockReturnValue(notesBuilder);
+    }
+    notesBuilder.in.mockResolvedValue({ data: [], error: null });
   });
 
-  it('預設篩選雙北', async () => {
+  // 縣市篩選改用 .or() 而非 .in()：school_city 是 registrations_with_school
+  // 左連接學校表帶出來的欄位，自由填寫校名（school_id 為 NULL）或學校已被
+  // 停用（is_active = false，schools 的讀取政策擋下）時 school_city 會是
+  // NULL。SQL 的 IN 對 NULL 求值為 NULL、視同不成立，該列會被整批濾掉 ——
+  // 而那正是規格要求「待人工確認學校」要醒目標記的一批，最不該消失。
+  // 用 OR 明確放行 school_city IS NULL，才能讓這批報名留在篩選結果裡。
+  it('預設篩選雙北，且放行 school_city 為 NULL 的報名（找不到我的學校／學校已停用）', async () => {
     await listRegistrations(EMPTY_FILTERS, 0);
-    expect(builder.in).toHaveBeenCalledWith('school_city', ['新北市', '臺北市']);
+    expect(builder.or).toHaveBeenCalledWith(
+      'school_city.in.("新北市","臺北市"),school_city.is.null'
+    );
+  });
+
+  it('縣市篩選條件確實包含 is.null，不是只縮小成 IN 清單', async () => {
+    await listRegistrations(EMPTY_FILTERS, 0);
+    const cityCall = builder.or.mock.calls.find((call) =>
+      String(call[0]).includes('school_city')
+    );
+    expect(cityCall?.[0]).toContain('school_city.is.null');
   });
 
   it('縣市清空後不加縣市條件', async () => {
     await listRegistrations({ ...EMPTY_FILTERS, cities: [] }, 0);
-    expect(builder.in).not.toHaveBeenCalledWith(
-      'school_city',
-      expect.anything()
+    expect(builder.or).not.toHaveBeenCalledWith(
+      expect.stringContaining('school_city')
     );
   });
 
@@ -78,6 +117,102 @@ describe('listRegistrations', () => {
     builder.range.mockResolvedValue({ data: null, count: null, error: { message: '壞了' } });
     const result = await listRegistrations(EMPTY_FILTERS, 0);
     expect(result).toEqual({ rows: [], total: 0 });
+  });
+
+  // 核心行為：admin_note 不是 registrations_with_school 檢視表本身的欄位
+  // （已拆到 registration_notes，只給 is_admin() 讀），listRegistrations
+  // 要另外查一次備註表、用 registration_id 合併回每一列。
+  it('把 registration_notes 的備註依 registration_id 合併回每一列', async () => {
+    builder.range.mockResolvedValue({
+      data: [{ id: 'reg-1' }, { id: 'reg-2' }],
+      count: 2,
+      error: null,
+    });
+    notesBuilder.in.mockResolvedValue({
+      data: [
+        { registration_id: 'reg-1', note: '已致電，約好週末回撥' },
+        { registration_id: 'reg-2', note: null },
+      ],
+      error: null,
+    });
+
+    const result = await listRegistrations(EMPTY_FILTERS, 0);
+
+    expect(notesBuilder.in).toHaveBeenCalledWith('registration_id', ['reg-1', 'reg-2']);
+    expect(result.rows).toEqual([
+      expect.objectContaining({ id: 'reg-1', admin_note: '已致電，約好週末回撥' }),
+      expect.objectContaining({ id: 'reg-2', admin_note: null }),
+    ]);
+  });
+
+  it('查無備註的報名合併後 admin_note 是 null，不是 undefined', async () => {
+    builder.range.mockResolvedValue({
+      data: [{ id: 'reg-1' }],
+      count: 1,
+      error: null,
+    });
+    notesBuilder.in.mockResolvedValue({ data: [], error: null });
+
+    const result = await listRegistrations(EMPTY_FILTERS, 0);
+    expect(result.rows[0].admin_note).toBeNull();
+  });
+
+  it('備註查詢失敗時主要列表仍然回傳，admin_note 留 null', async () => {
+    builder.range.mockResolvedValue({
+      data: [{ id: 'reg-1' }],
+      count: 1,
+      error: null,
+    });
+    notesBuilder.in.mockResolvedValue({
+      data: null,
+      error: { message: '壞了' },
+    });
+
+    const result = await listRegistrations(EMPTY_FILTERS, 0);
+    expect(result.rows).toEqual([expect.objectContaining({ id: 'reg-1', admin_note: null })]);
+  });
+
+  it('沒有任何列時不會多查一次備註表', async () => {
+    builder.range.mockResolvedValue({ data: [], count: 0, error: null });
+    await listRegistrations(EMPTY_FILTERS, 0);
+    expect(notesBuilder.in).not.toHaveBeenCalled();
+  });
+});
+
+describe('listAllForExport', () => {
+  beforeEach(() => {
+    for (const key of Object.keys(builder) as (keyof typeof builder)[]) {
+      builder[key].mockReset();
+      builder[key].mockReturnValue(builder);
+    }
+    builder.order.mockResolvedValue({ data: [], error: null });
+
+    for (const key of Object.keys(notesBuilder) as (keyof typeof notesBuilder)[]) {
+      notesBuilder[key].mockReset();
+      notesBuilder[key].mockReturnValue(notesBuilder);
+    }
+    notesBuilder.in.mockResolvedValue({ data: [], error: null });
+  });
+
+  it('匯出的每一列也合併了對應的內部備註', async () => {
+    builder.order.mockResolvedValue({
+      data: [{ id: 'reg-1' }],
+      error: null,
+    });
+    notesBuilder.in.mockResolvedValue({
+      data: [{ registration_id: 'reg-1', note: '已致電' }],
+      error: null,
+    });
+
+    const result = await listAllForExport(EMPTY_FILTERS);
+
+    expect(result).toEqual([expect.objectContaining({ id: 'reg-1', admin_note: '已致電' })]);
+  });
+
+  it('查詢出錯時回傳空陣列', async () => {
+    builder.order.mockResolvedValue({ data: null, error: { message: '壞了' } });
+    const result = await listAllForExport(EMPTY_FILTERS);
+    expect(result).toEqual([]);
   });
 });
 
