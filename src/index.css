@@ -10,6 +10,73 @@ body {
   @apply bg-slate-50 text-slate-900 antialiased;
 }
 
+@layer components {
+  /*
+    家長端共用的手繪語彙。集中寫在這裡而不是每頁各抄一串 class：
+    四個圓角刻意不等長，卡片才不像用尺拉出來的方框；邊框用很淡的墨色，
+    在米色底上仍看得出「一張紙」的輪廓，不必靠重陰影撐。
+  */
+  .doodle-card {
+    @apply rounded-[1.6rem_1.15rem_1.7rem_1.25rem] border-2 border-slate-900/10 bg-white shadow-[0_1px_0_rgba(15,23,42,0.05),0_18px_30px_-24px_rgba(30,58,138,0.55)];
+  }
+
+  /* 同一張紙翻個面：連續排列的卡片交錯用，圓角節奏才不會整齊得像複製貼上 */
+  .doodle-card-alt {
+    @apply rounded-[1.15rem_1.7rem_1.25rem_1.75rem] border-2 border-slate-900/10 bg-white shadow-[0_1px_0_rgba(15,23,42,0.05),0_18px_30px_-24px_rgba(30,58,138,0.55)];
+  }
+
+  /*
+    按鈕的落影刻意用實心色塊而不是柔邊陰影 —— 看起來像貼上去的紙片，
+    按下去整顆往下沉。手機沒有 hover 狀態，這個下沉是家長唯一能感覺到
+    「有按到」的回饋。
+  */
+  .doodle-btn {
+    @apply rounded-[1rem_0.75rem_1.05rem_0.8rem] bg-brand-600 font-semibold text-white shadow-[0_4px_0_#1d4ed8] transition hover:bg-brand-700 active:translate-y-[3px] active:shadow-[0_1px_0_#1d4ed8] disabled:opacity-60;
+  }
+
+  .doodle-btn-soft {
+    @apply rounded-[1rem_0.75rem_1.05rem_0.8rem] border-2 border-brand-500 bg-white font-semibold text-brand-700 shadow-[0_3px_0_#bfdbfe] transition hover:bg-brand-50 active:translate-y-[2px] active:shadow-[0_1px_0_#bfdbfe];
+  }
+
+  .doodle-btn-quiet {
+    @apply rounded-[0.9rem_0.7rem_0.95rem_0.75rem] border-2 border-slate-300 bg-white font-medium text-slate-600 transition hover:bg-slate-50 active:translate-y-[1px];
+  }
+
+  /* 危險操作（刪除、撤回）沿用同一套厚度，只換顏色，家長才認得出是同一種按鈕 */
+  .doodle-btn-danger {
+    @apply rounded-[0.9rem_0.7rem_0.95rem_0.75rem] bg-red-600 font-semibold text-white shadow-[0_3px_0_#b91c1c] transition hover:bg-red-700 active:translate-y-[2px] active:shadow-[0_1px_0_#b91c1c];
+  }
+}
+
+/*
+  紙感底色。純白在夜裡用手機看太刺眼（家長多半是哄睡完才坐下來報名），
+  淡米色配上極淡的網點，跟手繪插圖是同一種質地。網點用 background-image
+  畫出來，不必多下載一張圖。
+*/
+.bg-paper {
+  background-color: #fdfcf8;
+  background-image: radial-gradient(rgba(30, 58, 138, 0.07) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/*
+  插圖的漂浮：幅度壓在 6px 以內、週期拉長到 7 秒，眼角餘光才只覺得
+  畫面是活的，不會變成一直在動的干擾物。
+*/
+@keyframes doodle-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-2deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(1.5deg);
+  }
+}
+
+.animate-doodle-float {
+  animation: doodle-float 7s ease-in-out infinite;
+}
+
 /*
   閃電用 SVG 路徑加 CSS 動畫做，不用影片。
   影片背景在手機上耗流量又耗電，而閃電這種高對比、短促、間歇的動態，
@@ -40,4 +107,18 @@ body {
 
 .animate-lightning {
   animation: lightning-flash 6s ease-in-out infinite;
+}
+
+/*
+  開了「減少動態效果」就全部停下來，包含捲動的平滑效果 ——
+  對前庭敏感的使用者這是必要的，不是可有可無的貼心。
+*/
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .animate-doodle-float {
+    animation: none;
+  }
 }

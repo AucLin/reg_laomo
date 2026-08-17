@@ -288,7 +288,7 @@ export default function SchoolSelector({ value, onChange }: Props) {
 
             <ul className="mt-2 max-h-64 overflow-y-auto rounded-xl border border-slate-200 bg-white">
               {searching && (
-                <li className="px-4 py-3 text-sm text-slate-400">搜尋中…</li>
+                <li className="px-4 py-3 text-sm text-slate-500">搜尋中…</li>
               )}
               {!searching &&
                 results.map((school) => (
@@ -299,12 +299,12 @@ export default function SchoolSelector({ value, onChange }: Props) {
                       className="w-full px-4 py-3 text-left text-sm transition hover:bg-brand-50"
                     >
                       <span className="font-medium text-slate-900">{school.name}</span>
-                      <span className="ml-2 text-slate-400">· {school.city}</span>
+                      <span className="ml-2 text-slate-500">· {school.city}</span>
                     </button>
                   </li>
                 ))}
               {!searching && results.length === 0 && keyword !== '' && (
-                <li className="px-4 py-3 text-sm text-slate-400">
+                <li className="px-4 py-3 text-sm text-slate-500">
                   找不到符合的學校，試試放寬縣市範圍
                 </li>
               )}
@@ -365,7 +365,7 @@ function SelectedSchool({ school, onClear }: { school: School; onClear: () => vo
         type="button"
         onClick={onClear}
         aria-label="清除已選學校"
-        className="rounded-lg p-1.5 text-slate-400 transition hover:bg-white hover:text-slate-600"
+        className="rounded-lg p-1.5 text-slate-500 transition hover:bg-white hover:text-slate-700"
       >
         <X className="h-4 w-4" />
       </button>

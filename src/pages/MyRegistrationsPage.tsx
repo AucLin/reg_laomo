@@ -9,6 +9,12 @@ import StudentForm, {
   studentToFormValue,
   type StudentFormValue,
 } from '../components/StudentForm';
+import {
+  ClipboardDoodle,
+  DashedRule,
+  SearchingDoodle,
+  Squiggle,
+} from '../components/doodles';
 import { deleteRegistration, listMyRegistrations } from '../lib/registrations';
 import {
   createStudent,
@@ -144,25 +150,30 @@ export default function MyRegistrationsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50">
+      <div className="min-h-screen bg-paper">
         <AppHeader />
-        <div className="p-8 text-center text-slate-500">載入中…</div>
+        <div className="p-8 text-center text-slate-600">載入中…</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-paper">
       <AppHeader />
       <div className="mx-auto max-w-3xl px-4 py-8 sm:py-12">
         <section>
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <h1 className="text-2xl font-bold text-slate-900">我的孩子</h1>
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div className="min-w-0">
+              <h1 className="text-2xl font-bold text-slate-900">我的孩子</h1>
+              <div className="mt-1 w-20">
+                <Squiggle className="text-amber-400" />
+              </div>
+            </div>
             {draft === null && (
               <button
                 type="button"
                 onClick={startAddStudent}
-                className="rounded-xl border border-brand-500 px-4 py-2.5 text-sm font-semibold text-brand-600 transition hover:bg-brand-50"
+                className="doodle-btn-soft px-4 py-2.5 text-sm"
               >
                 新增孩子
               </button>
@@ -170,44 +181,49 @@ export default function MyRegistrationsPage() {
           </div>
 
           {students.length === 0 && draft === null && (
-            <p className="mt-4 rounded-2xl bg-white p-5 text-sm text-slate-500 shadow-sm">
-              建立孩子的資料後，之後報名課程或比賽就不用重打一次。
-            </p>
+            <div className="doodle-card mt-4 flex flex-wrap items-center gap-4 px-5 py-5">
+              <SearchingDoodle className="h-16 w-auto shrink-0 text-slate-400" />
+              <p className="min-w-0 flex-1 text-sm leading-relaxed text-slate-600">
+                建立孩子的資料後，之後報名課程或比賽就不用重打一次。
+              </p>
+            </div>
           )}
 
           {students.length > 0 && (
             <ul className="mt-4 space-y-3">
-              {students.map((student) => {
+              {students.map((student, index) => {
                 const count = registrationCount.get(student.id) ?? 0;
                 return (
                   <li
                     key={student.id}
-                    className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200/80"
+                    className={`${
+                      index % 2 === 0 ? 'doodle-card' : 'doodle-card-alt'
+                    } p-5`}
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <h2 className="font-semibold text-slate-900">
+                      <div className="min-w-0">
+                        <h2 className="break-words font-bold text-slate-900">
                           {student.name}
                         </h2>
-                        <p className="mt-1 text-sm text-slate-600">
+                        <p className="mt-1 break-words text-sm text-slate-700">
                           {student.school_name ?? student.school_name_raw}
                           {!student.school_name && (
-                            <span className="ml-2 rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-800">
+                            <span className="ml-2 inline-block rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
                               學校待確認
                             </span>
                           )}
                         </p>
-                        <p className="mt-1 text-sm text-slate-500">
+                        <p className="mt-1 text-sm text-slate-600">
                           {formatGrade(student.grade)}
                           {student.class_name && ` · ${student.class_name}`}
                         </p>
                       </div>
 
-                      <div className="flex gap-3">
+                      <div className="flex flex-wrap gap-2">
                         <button
                           type="button"
                           onClick={() => startEditStudent(student)}
-                          className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50"
+                          className="doodle-btn-quiet px-4 py-2 text-sm"
                         >
                           編輯
                         </button>
@@ -217,14 +233,14 @@ export default function MyRegistrationsPage() {
                               <button
                                 type="button"
                                 onClick={() => handleDeleteStudent(student.id)}
-                                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700"
+                                className="doodle-btn-danger px-4 py-2 text-sm"
                               >
                                 確定刪除
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setConfirmingStudentId(null)}
-                                className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50"
+                                className="doodle-btn-quiet px-4 py-2 text-sm"
                               >
                                 取消
                               </button>
@@ -233,7 +249,7 @@ export default function MyRegistrationsPage() {
                             <button
                               type="button"
                               onClick={() => setConfirmingStudentId(student.id)}
-                              className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50"
+                              className="doodle-btn-quiet px-4 py-2 text-sm"
                             >
                               刪除
                             </button>
@@ -242,7 +258,8 @@ export default function MyRegistrationsPage() {
                     </div>
 
                     {count > 0 && (
-                      <p className="mt-3 text-xs text-slate-400">
+                      // 原本是 slate-400，在白底上只有 2.8:1，家長不會發現這行字
+                      <p className="mt-3 text-xs text-slate-600">
                         已有 {count} 筆報名紀錄，如需更正請聯繫我們
                       </p>
                     )}
@@ -253,34 +270,37 @@ export default function MyRegistrationsPage() {
           )}
 
           {draft !== null && (
-            <div className="mt-4 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200/80 sm:p-6">
-              <h2 className="mb-4 text-lg font-semibold text-slate-900">
+            <div className="doodle-card mt-4 p-5 sm:p-6">
+              <h2 className="text-lg font-bold text-slate-900">
                 {editingStudentId ? '編輯孩子資料' : '新增孩子'}
               </h2>
+              <div className="mb-4 mt-2 text-slate-300">
+                <DashedRule />
+              </div>
               <StudentForm value={draft} onChange={setDraft} />
 
               {studentError && (
                 <p
                   role="alert"
-                  className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
+                  className="mt-4 rounded-xl border-2 border-red-200 bg-red-50 px-3 py-2.5 text-sm font-medium text-red-700"
                 >
                   {studentError}
                 </p>
               )}
 
-              <div className="mt-5 flex gap-3">
+              <div className="mt-5 flex flex-wrap gap-3">
                 <button
                   type="button"
                   onClick={handleSaveStudent}
                   disabled={savingStudent}
-                  className="rounded-xl bg-brand-600 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
+                  className="doodle-btn px-6 py-2.5 text-sm"
                 >
                   {savingStudent ? '儲存中…' : '儲存'}
                 </button>
                 <button
                   type="button"
                   onClick={cancelDraft}
-                  className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-600 transition hover:bg-slate-50"
+                  className="doodle-btn-quiet px-4 py-2.5 text-sm"
                 >
                   取消
                 </button>
@@ -293,48 +313,55 @@ export default function MyRegistrationsPage() {
         {draft === null && studentError && (
           <p
             role="alert"
-            className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700"
+            className="mt-4 rounded-xl border-2 border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700"
           >
             {studentError}
           </p>
         )}
 
         <section className="mt-12">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <h1 className="text-2xl font-bold text-slate-900">我的報名</h1>
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div className="min-w-0">
+              <h1 className="text-2xl font-bold text-slate-900">我的報名</h1>
+              <div className="mt-1 w-20">
+                <Squiggle className="text-amber-400" />
+              </div>
+            </div>
             {registrations.length > 0 && (
-              <Link
-                to="/apply"
-                className="rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-              >
+              <Link to="/apply" className="doodle-btn px-4 py-2.5 text-sm">
                 再報名一位孩子
               </Link>
             )}
           </div>
 
           {registrations.length === 0 ? (
-            <div className="mt-6 rounded-2xl bg-white p-8 text-center shadow-sm">
-              <p className="text-slate-600">您還沒有任何報名紀錄</p>
-              <Link
-                to="/apply"
-                className="mt-4 inline-block rounded-xl bg-brand-600 px-6 py-3 font-semibold text-white transition hover:bg-brand-700"
-              >
+            <div className="doodle-card mt-6 px-6 py-10 text-center">
+              <ClipboardDoodle className="mx-auto h-24 w-auto -rotate-3 text-brand-600" />
+              <p className="mt-4 text-base font-semibold text-slate-700">
+                您還沒有任何報名紀錄
+              </p>
+              <p className="mt-2 text-sm text-slate-600">
+                填一次資料，之後報名課程或比賽都用得上。
+              </p>
+              <Link to="/apply" className="doodle-btn mt-6 inline-block px-6 py-3">
                 立即報名
               </Link>
             </div>
           ) : (
-            <ul className="mt-6 space-y-4">
-              {registrations.map((registration) => (
+            <ul className="mt-6 space-y-5">
+              {registrations.map((registration, index) => (
                 <li
                   key={registration.id}
-                  className="rounded-2xl bg-white p-5 shadow-sm sm:p-6"
+                  className={`${
+                    index % 2 === 0 ? 'doodle-card' : 'doodle-card-alt'
+                  } p-5 sm:p-6`}
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <h2 className="text-lg font-semibold text-slate-900">
+                    <div className="min-w-0">
+                      <h2 className="break-words text-lg font-bold text-slate-900">
                         {registration.student_name}
                       </h2>
-                      <p className="mt-1 text-sm text-slate-600">
+                      <p className="mt-1 break-words text-sm text-slate-700">
                         {registration.school_name ?? registration.school_name_raw}
                         {/* 用 school_name（而非 school_id）判斷要不要顯示待確認標記：
                             school_id 有值不代表校名一定解析得出來 —— 學校名錄
@@ -342,12 +369,12 @@ export default function MyRegistrationsPage() {
                             停用，左連接會查無資料、school_name 一樣變 null，
                             這批報名同樣需要人工確認是哪所學校 */}
                         {!registration.school_name && (
-                          <span className="ml-2 rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-800">
+                          <span className="ml-2 inline-block rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
                             學校待確認
                           </span>
                         )}
                       </p>
-                      <p className="mt-1 text-sm text-slate-500">
+                      <p className="mt-1 text-sm text-slate-600">
                         {formatGrade(registration.grade)}
                         {registration.class_name && ` · ${registration.class_name}`}
                       </p>
@@ -355,7 +382,11 @@ export default function MyRegistrationsPage() {
                     <StatusBadge status={registration.status} />
                   </div>
 
-                  <p className="mt-4 text-xs text-slate-400">
+                  <div className="mt-4 text-slate-300">
+                    <DashedRule />
+                  </div>
+
+                  <p className="mt-3 text-xs text-slate-600">
                     送出時間：
                     {new Date(registration.created_at).toLocaleString('zh-TW')}
                   </p>
@@ -369,7 +400,7 @@ export default function MyRegistrationsPage() {
                   {errorId === registration.id && errorMessage && (
                     <p
                       role="alert"
-                      className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
+                      className="mt-4 rounded-xl border-2 border-red-200 bg-red-50 px-3 py-2.5 text-sm font-medium text-red-700"
                     >
                       {errorMessage}
                     </p>
@@ -378,20 +409,20 @@ export default function MyRegistrationsPage() {
                   {/* 待審核才給改動。這與資料庫的列級權限一致 ——
                       介面不提供的操作，資料庫層也一併擋住。 */}
                   {registration.status === 'pending' ? (
-                    <div className="mt-4 flex gap-3">
+                    <div className="mt-4 flex flex-wrap gap-3">
                       {confirmingId === registration.id ? (
                         <>
                           <button
                             type="button"
                             onClick={() => handleDelete(registration.id)}
-                            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700"
+                            className="doodle-btn-danger px-4 py-2 text-sm"
                           >
                             確定撤回
                           </button>
                           <button
                             type="button"
                             onClick={() => setConfirmingId(null)}
-                            className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50"
+                            className="doodle-btn-quiet px-4 py-2 text-sm"
                           >
                             取消
                           </button>
@@ -400,14 +431,14 @@ export default function MyRegistrationsPage() {
                         <>
                           <Link
                             to={`/apply?edit=${registration.id}`}
-                            className="rounded-lg border border-brand-500 px-4 py-2 text-sm font-medium text-brand-600 transition hover:bg-brand-50"
+                            className="doodle-btn-soft px-4 py-2 text-sm"
                           >
                             修改
                           </Link>
                           <button
                             type="button"
                             onClick={() => handleStartConfirm(registration.id)}
-                            className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50"
+                            className="doodle-btn-quiet px-4 py-2 text-sm"
                           >
                             撤回報名
                           </button>
@@ -415,7 +446,7 @@ export default function MyRegistrationsPage() {
                       )}
                     </div>
                   ) : (
-                    <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-500">
+                    <p className="mt-4 break-words rounded-[1rem_0.8rem_1.05rem_0.85rem] border-2 border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700">
                       已進入處理流程，如需異動請聯絡中心：{CENTER_PHONE}
                     </p>
                   )}

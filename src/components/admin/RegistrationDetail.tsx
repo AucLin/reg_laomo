@@ -60,7 +60,7 @@ export default function RegistrationDetail({
             type="button"
             onClick={onClose}
             aria-label="關閉"
-            className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100"
+            className="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-100"
           >
             <X className="h-5 w-5" />
           </button>
@@ -134,7 +134,7 @@ export default function RegistrationDetail({
               >
                 內部備註
               </label>
-              <span id="detail-note-hint" className="text-sm font-normal text-slate-400">
+              <span id="detail-note-hint" className="text-sm font-normal text-slate-500">
                 家長看不到
               </span>
             </div>

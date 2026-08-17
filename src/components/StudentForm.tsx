@@ -202,7 +202,7 @@ export default function StudentForm({ value, onChange, idPrefix = '' }: Props) {
             </label>
             <span
               id={id('class_name-optional')}
-              className="text-xs font-normal text-slate-400"
+              className="text-xs font-normal text-slate-500"
             >
               （選填）
             </span>

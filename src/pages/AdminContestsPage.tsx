@@ -696,7 +696,9 @@ export default function AdminContestsPage() {
                   className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200/80"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
+                    {/* min-w-0：flex 子元素預設不肯縮到內容以下，少了它，
+                        主辦單位那種一長串的比賽名稱會把整張卡片撐破 */}
+                    <div className="min-w-0 flex-1 break-words">
                       <h2 className="font-semibold text-slate-900">
                         {contest.title}
                       </h2>
@@ -985,11 +987,14 @@ function SharePanel({
       )}
 
       {/* 臉書只吃網址，帶不了自訂文字，所以文案要自己貼 */}
-      <p className="mt-2 text-xs text-slate-400">
+      <p className="mt-2 text-xs text-slate-500">
         臉書只會帶網址，貼文內容請用「複製整段文案」自己貼上。
       </p>
 
-      <pre className="mt-3 whitespace-pre-wrap rounded-lg bg-white p-3 text-xs text-slate-600">
+      {/* whitespace-pre-wrap 不會斷開沒有空白的長字串，文案裡的報名連結
+          在手機上量到會超出容器 40px，整頁跟著能左右拉。break-words 讓
+          它該斷就斷 */}
+      <pre className="mt-3 whitespace-pre-wrap break-words rounded-lg bg-white p-3 text-xs text-slate-600">
         {text}
       </pre>
     </div>
@@ -1023,7 +1028,7 @@ function ModeTab({
 
 function RequiredMark() {
   return (
-    <span aria-hidden="true" className="text-red-500">
+    <span aria-hidden="true" className="text-red-600">
       *
     </span>
   );
@@ -1092,7 +1097,7 @@ function Field({
         </label>
         {required && <RequiredMark />}
         {hint && (
-          <span id={`${id}-hint`} className="text-xs font-normal text-slate-400">
+          <span id={`${id}-hint`} className="text-xs font-normal text-slate-500">
             {hint}
           </span>
         )}

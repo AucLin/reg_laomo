@@ -296,7 +296,7 @@ export default function ApplyPage() {
                       <span className="block font-semibold text-slate-900">
                         {student.name}
                       </span>
-                      <span className="block text-sm text-slate-500">
+                      <span className="block text-sm text-slate-600">
                         {formatGrade(student.grade)}
                         {' · '}
                         {student.school_name ?? student.school_name_raw}
