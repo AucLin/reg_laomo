@@ -1,1 +1,5 @@
+# 這個檔案的規則優先序高於 netlify.toml —— API 那條一定要寫在這裡，
+# 只寫在 netlify.toml 會被下面的萬用規則整碗端走，/api/* 會回傳首頁的
+# HTML 而不是函式的回應。
+/api/*    /.netlify/functions/:splat    200
 /*    /index.html   200
