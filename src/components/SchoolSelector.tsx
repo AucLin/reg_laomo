@@ -68,6 +68,12 @@ export default function SchoolSelector({ value, onChange }: Props) {
     還會讓結果清單在打字過程中亂跳，所以用這個狀態擋住防抖動的查詢。
   */
   const [composing, setComposing] = useState(false);
+  /*
+    縣市選項預設收起來。攤開是 21 個按鈕、佔掉三行，比真正重要的搜尋框
+    還顯眼，但絕大多數家長根本不用改 —— 預設的雙北就是老莫的招生範圍。
+    收合後只留一行摘要，需要的人再點開。
+  */
+  const [citiesOpen, setCitiesOpen] = useState(false);
 
   /*
     編輯既有報名時，外面只傳得進 schoolId，沒有校名。
@@ -202,35 +208,51 @@ export default function SchoolSelector({ value, onChange }: Props) {
         <SelectedSchool school={selected} onClear={clearSelection} />
       ) : (
         <>
-          {/* 第二步：縣市，預設雙北 */}
+          {/* 第二步：縣市，預設雙北且收合 */}
           <fieldset>
-            <legend className="text-sm font-medium text-slate-700">
-              縣市
-              <span className="ml-2 font-normal text-slate-400">
-                預設為老莫招生範圍，可自行調整
-              </span>
-            </legend>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {CITY_OPTIONS.map((city) => (
-                <label
-                  key={city}
-                  className={`cursor-pointer rounded-full border px-3 py-1.5 text-sm transition ${
-                    cities.includes(city)
-                      ? 'border-brand-500 bg-brand-50 text-brand-700'
-                      : 'border-slate-300 bg-white text-slate-600'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    className="sr-only"
-                    checked={cities.includes(city)}
-                    onChange={() => toggleCity(city)}
-                    aria-label={city}
-                  />
-                  {city}
-                </label>
-              ))}
+            <div className="flex items-center justify-between gap-3">
+              <legend className="text-sm font-medium text-slate-700">搜尋範圍</legend>
+              <button
+                type="button"
+                onClick={() => setCitiesOpen((open) => !open)}
+                aria-expanded={citiesOpen}
+                className="text-sm text-brand-600 transition hover:text-brand-700"
+              >
+                {citiesOpen ? '收合' : '調整'}
+              </button>
             </div>
+
+            {citiesOpen ? (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {CITY_OPTIONS.map((city) => (
+                  <label
+                    key={city}
+                    className={`cursor-pointer rounded-full border px-3 py-1.5 text-sm transition ${
+                      cities.includes(city)
+                        ? 'border-brand-500 bg-brand-50 text-brand-700'
+                        : 'border-slate-300 bg-white text-slate-600'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      className="sr-only"
+                      checked={cities.includes(city)}
+                      onChange={() => toggleCity(city)}
+                      aria-label={city}
+                    />
+                    {city}
+                  </label>
+                ))}
+              </div>
+            ) : (
+              /*
+                收合時仍要讓家長看得到目前的範圍。看不到範圍卻搜不到學校，
+                就會變成「明明有這所學校為什麼找不到」的無頭公案。
+              */
+              <p className="mt-1 text-sm text-slate-500">
+                {cities.length === 0 ? '全國' : cities.join('、')}
+              </p>
+            )}
           </fieldset>
 
           {/* 第三步：搜尋 */}

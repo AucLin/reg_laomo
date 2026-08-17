@@ -44,8 +44,22 @@ describe('SchoolSelector', () => {
     vi.restoreAllMocks();
   });
 
-  it('縣市預設勾選雙北', () => {
+  /*
+    縣市選項預設收起來：攤開是 21 個按鈕、佔掉三行，比真正重要的搜尋框
+    還顯眼，但絕大多數家長根本不用改。
+  */
+  it('縣市選項預設收合，只顯示目前範圍', () => {
     render(<SchoolSelector value={emptySelection} onChange={vi.fn()} />);
+    expect(screen.queryByLabelText('桃園市')).not.toBeInTheDocument();
+    // 收合也要看得到範圍，否則搜不到學校時家長不知道是縣市擋掉的
+    expect(screen.getByText('新北市、臺北市')).toBeInTheDocument();
+  });
+
+  it('縣市預設勾選雙北', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<SchoolSelector value={emptySelection} onChange={vi.fn()} />);
+
+    await user.click(screen.getByRole('button', { name: '調整' }));
     expect(screen.getByLabelText('新北市')).toBeChecked();
     expect(screen.getByLabelText('臺北市')).toBeChecked();
     expect(screen.getByLabelText('桃園市')).not.toBeChecked();
@@ -270,6 +284,7 @@ describe('SchoolSelector', () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<SchoolSelector value={emptySelection} onChange={vi.fn()} />);
 
+    await user.click(screen.getByRole('button', { name: '調整' }));
     await user.click(screen.getByLabelText('新北市'));
     await user.click(screen.getByLabelText('臺北市'));
     await user.type(screen.getByLabelText('搜尋學校名稱'), '中正');
@@ -280,6 +295,19 @@ describe('SchoolSelector', () => {
         expect.objectContaining({ cities: [] })
       );
     });
+  });
+
+  it('縣市全部取消後，收合狀態顯示「全國」', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<SchoolSelector value={emptySelection} onChange={vi.fn()} />);
+
+    await user.click(screen.getByRole('button', { name: '調整' }));
+    await user.click(screen.getByLabelText('新北市'));
+    await user.click(screen.getByLabelText('臺北市'));
+    await user.click(screen.getByRole('button', { name: '收合' }));
+
+    // 空白一片會讓家長以為是壞掉，要明確講出「全國」
+    expect(screen.getByText('全國')).toBeInTheDocument();
   });
 
   /*

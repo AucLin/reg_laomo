@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import AppHeader from '../components/AppHeader';
@@ -165,11 +165,9 @@ export default function ApplyPage() {
           </p>
         )}
 
-        <form onSubmit={handleSubmit} className="mt-8 space-y-8" noValidate>
-          <section className="rounded-2xl bg-white p-5 shadow-sm sm:p-6">
-            <h2 className="text-lg font-semibold text-slate-900">學生資訊</h2>
-
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <form onSubmit={handleSubmit} className="mt-8 space-y-6" noValidate>
+          <FormSection step={1} title="學生資訊">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label
                   htmlFor="student_name"
@@ -264,10 +262,10 @@ export default function ApplyPage() {
                 />
               </div>
             </div>
+          </FormSection>
 
-            <div className="mt-6">
-              <SchoolSelector value={school} onChange={handleSchoolChange} />
-            </div>
+          <FormSection step={2} title="就讀學校">
+            <SchoolSelector value={school} onChange={handleSchoolChange} />
 
             <div className="mt-4 sm:max-w-xs">
               <label htmlFor="grade" className="block text-sm font-medium text-slate-700">
@@ -287,12 +285,10 @@ export default function ApplyPage() {
                 ))}
               </select>
             </div>
-          </section>
+          </FormSection>
 
-          <section className="rounded-2xl bg-white p-5 shadow-sm sm:p-6">
-            <h2 className="text-lg font-semibold text-slate-900">家長資訊</h2>
-
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <FormSection step={3} title="家長資訊">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label
                   htmlFor="parent_name"
@@ -349,7 +345,7 @@ export default function ApplyPage() {
                 />
               </div>
             </div>
-          </section>
+          </FormSection>
 
           {error && (
             <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -367,5 +363,35 @@ export default function ApplyPage() {
         </form>
       </div>
     </div>
+  );
+}
+
+/*
+  表單的一段。編號徽章與標題下的分隔線是為了讓家長一眼看出「總共三段、
+  現在在第幾段」—— 原本三段共用同一種白卡片、標題大小也一樣，整頁看
+  起來只是一長串欄位。
+*/
+function FormSection({
+  step,
+  title,
+  children,
+}: {
+  step: number;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/80">
+      <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4 sm:px-6">
+        <span
+          aria-hidden="true"
+          className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-brand-50 text-sm font-semibold text-brand-700"
+        >
+          {step}
+        </span>
+        <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
+      </div>
+      <div className="p-5 sm:p-6">{children}</div>
+    </section>
   );
 }
