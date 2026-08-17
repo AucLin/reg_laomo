@@ -62,7 +62,8 @@ async function cleanup(emails: string[]) {
   沒有這個旗標就只印出將要對哪個環境做什麼，不連線、不寫入，直接結束。
   （若中途被 SIGKILL 之類訊號強制終止，main().catch() 攔不到、cleanup()
   不會執行，可能留下殘留測試帳號——這是已知限制，需要人工檢查
-  auth.users 裡是否還有 rls-test-a@mailinator.com／rls-test-b@mailinator.com。）
+  auth.users 裡是否還有 rls-test-a@mailinator.com／rls-test-b@mailinator.com、
+  rls-student-a@example.test／rls-student-b@example.test。）
 */
 function confirmTargetOrExit() {
   console.log(`目標資料庫：${URL}`);
@@ -331,6 +332,78 @@ async function main() {
 
   await cleanup([emailA, emailB]);
 
+  // ---- students 的列級權限 ----
+  {
+    const { client: parentA, userId: idA } = await createTestUser(
+      'rls-student-a@example.test',
+      'Test-1234'
+    );
+    const { client: parentB, userId: idB } = await createTestUser(
+      'rls-student-b@example.test',
+      'Test-1234'
+    );
+
+    const { data: created, error: createError } = await parentA
+      .from('students')
+      .insert({
+        parent_id: idA,
+        name: '測試小孩',
+        gender: 'male',
+        birthday: '2016-05-01',
+        school_name_raw: '測試國小',
+        grade: 'E4',
+      })
+      .select('id');
+    check(
+      '家長可新增自己的孩子',
+      !createError && (created ?? []).length === 1,
+      createError?.message ?? ''
+    );
+
+    const studentId = created?.[0]?.id as string;
+
+    const { data: seenByB } = await parentB
+      .from('students')
+      .select('id')
+      .eq('id', studentId);
+    check('家長 B 讀不到家長 A 的孩子', (seenByB ?? []).length === 0);
+
+    // 列級權限擋下時 error 是 null，一定要看回傳的列數
+    const { data: updatedByB } = await parentB
+      .from('students')
+      .update({ name: '被改掉了' })
+      .eq('id', studentId)
+      .select('id');
+    check('家長 B 改不動家長 A 的孩子', (updatedByB ?? []).length === 0);
+
+    /*
+      這一條守的是政策裡的 WITH CHECK (parent_id = auth.uid())。
+      少了那一句，家長改得動 parent_id，等於把自己的孩子塞給別人的帳號。
+    */
+    const { data: reassigned } = await parentA
+      .from('students')
+      .update({ parent_id: idB })
+      .eq('id', studentId)
+      .select('id');
+    check('家長改不動 parent_id，塞不走自己的孩子', (reassigned ?? []).length === 0);
+
+    const { data: renamed } = await parentA
+      .from('students')
+      .update({ class_name: '孝班' })
+      .eq('id', studentId)
+      .select('id');
+    check('家長改得動自己孩子的一般欄位', (renamed ?? []).length === 1);
+
+    const { data: deletedByB } = await parentB
+      .from('students')
+      .delete()
+      .eq('id', studentId)
+      .select('id');
+    check('家長 B 刪不掉家長 A 的孩子', (deletedByB ?? []).length === 0);
+
+    await cleanup(['rls-student-a@example.test', 'rls-student-b@example.test']);
+  }
+
   const failed = results.filter((item) => !item.passed);
   console.log(`\n共 ${results.length} 項，失敗 ${failed.length} 項。`);
   if (failed.length > 0) {
@@ -344,7 +417,12 @@ main().catch(async (error) => {
   console.error('\n驗證腳本執行失敗：', error.message);
   // 即使中途失敗也要嘗試清理，避免留下測試帳號
   try {
-    await cleanup(['rls-test-a@mailinator.com', 'rls-test-b@mailinator.com']);
+    await cleanup([
+      'rls-test-a@mailinator.com',
+      'rls-test-b@mailinator.com',
+      'rls-student-a@example.test',
+      'rls-student-b@example.test',
+    ]);
   } catch {
     // 清理本身失敗就沒辦法了，留給人工檢查
   }
