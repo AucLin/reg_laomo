@@ -9,6 +9,7 @@ import MyRegistrationsPage from './pages/MyRegistrationsPage';
 import AdminPage from './pages/AdminPage';
 import ContestsPage from './pages/ContestsPage';
 import AdminContestsPage from './pages/AdminContestsPage';
+import AdminLayout from './components/admin/AdminLayout';
 
 export default function App() {
   return (
@@ -38,22 +39,18 @@ export default function App() {
           <Route path="/contests" element={<ContestsPage />} />
           {/* 分享出去的單場比賽連結 */}
           <Route path="/contests/:contestId" element={<ContestsPage />} />
+          {/* 後台的頁面共用一個外框（側邊欄），守衛只掛在外層一次 */}
           <Route
             path="/admin"
             element={
               <AdminRoute>
-                <AdminPage />
+                <AdminLayout />
               </AdminRoute>
             }
-          />
-          <Route
-            path="/admin/contests"
-            element={
-              <AdminRoute>
-                <AdminContestsPage />
-              </AdminRoute>
-            }
-          />
+          >
+            <Route index element={<AdminPage />} />
+            <Route path="contests" element={<AdminContestsPage />} />
+          </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>

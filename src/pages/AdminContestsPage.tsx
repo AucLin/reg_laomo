@@ -1,7 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
 import { Check, Copy, Download, Eye, Share2 } from 'lucide-react';
-import AppHeader from '../components/AppHeader';
 import StatusBadge from '../components/StatusBadge';
 import Spinner, { PageLoading } from '../components/Spinner';
 import { useImeGuardedInput } from '../lib/hooks/useImeGuardedInput';
@@ -334,566 +332,558 @@ export default function AdminContestsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <AppHeader />
-      <div className="mx-auto max-w-5xl px-4 py-8">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">比賽管理</h1>
-            <Link to="/admin" className="text-sm text-brand-600 underline">
-              回報名管理
-            </Link>
-          </div>
-          {form === null && (
-            <button
-              type="button"
-              onClick={startCreate}
-              className="rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-            >
-              新增比賽
-            </button>
-          )}
-        </div>
-
-        {error && (
-          <p
-            role="alert"
-            className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
+    <div className="mx-auto max-w-5xl px-4 py-8">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="text-2xl font-bold text-slate-900">比賽管理</h1>
+        {form === null && (
+          <button
+            type="button"
+            onClick={startCreate}
+            className="rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
           >
-            {error}
-          </p>
+            新增比賽
+          </button>
         )}
+      </div>
 
-        {form && (
-          <section className="mt-6 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/80">
-            <div className="border-b border-slate-100 px-5 py-4 sm:px-6">
-              <h2 className="text-lg font-semibold text-slate-900">
-                {editingId ? '編輯比賽' : '新增比賽'}
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                標示 <RequiredMark /> 的是必填。存成草稿家長看不到，要按發佈才會出現。
+      {error && (
+        <p
+          role="alert"
+          className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
+        >
+          {error}
+        </p>
+      )}
+
+      {form && (
+        <section className="mt-6 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/80">
+          <div className="border-b border-slate-100 px-5 py-4 sm:px-6">
+            <h2 className="text-lg font-semibold text-slate-900">
+              {editingId ? '編輯比賽' : '新增比賽'}
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              標示 <RequiredMark /> 的是必填。存成草稿家長看不到，要按發佈才會出現。
+            </p>
+          </div>
+
+          <div className="space-y-6 p-5 sm:p-6">
+            {/*
+              先讓系統抓一輪墊底，再手動修。抓到的是猜的，所以是「帶入」
+              而不是取代手填 —— 帶入之後每一欄都還在，照樣可以改。
+            */}
+            <div className="rounded-xl bg-slate-50 p-4">
+              <p className="text-sm font-medium text-slate-700">
+                自動帶入（可略過，直接手填）
               </p>
-            </div>
 
-            <div className="space-y-6 p-5 sm:p-6">
-              {/*
-                先讓系統抓一輪墊底，再手動修。抓到的是猜的，所以是「帶入」
-                而不是取代手填 —— 帶入之後每一欄都還在，照樣可以改。
-              */}
-              <div className="rounded-xl bg-slate-50 p-4">
-                <p className="text-sm font-medium text-slate-700">
-                  自動帶入（可略過，直接手填）
-                </p>
+              <div className="mt-2 flex gap-2">
+                <ModeTab
+                  active={importMode === 'url'}
+                  onClick={() => {
+                    setImportMode('url');
+                    setImportNote('');
+                  }}
+                >
+                  貼網址
+                </ModeTab>
+                <ModeTab
+                  active={importMode === 'text'}
+                  onClick={() => {
+                    setImportMode('text');
+                    setImportNote('');
+                  }}
+                >
+                  貼文字
+                </ModeTab>
+              </div>
 
-                <div className="mt-2 flex gap-2">
-                  <ModeTab
-                    active={importMode === 'url'}
-                    onClick={() => {
-                      setImportMode('url');
-                      setImportNote('');
-                    }}
-                  >
-                    貼網址
-                  </ModeTab>
-                  <ModeTab
-                    active={importMode === 'text'}
-                    onClick={() => {
-                      setImportMode('text');
-                      setImportNote('');
-                    }}
-                  >
-                    貼文字
-                  </ModeTab>
-                </div>
-
-                {importMode === 'url' ? (
-                  <div className="mt-3">
-                    <label htmlFor="contest_source_url" className="sr-only">
-                      比賽公告網址
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      <input
-                        id="contest_source_url"
-                        type="url"
-                        value={sourceUrl}
-                        onChange={(event) => setSourceUrl(event.target.value)}
-                        placeholder="https://例如主辦單位的比賽公告頁"
-                        className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-brand-500"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleImportFromUrl}
-                        disabled={importing || sourceUrl.trim() === ''}
-                        className="inline-flex items-center gap-2 rounded-lg border border-brand-500 px-4 py-2 text-sm font-medium text-brand-600 transition hover:bg-brand-50 disabled:opacity-60"
-                      >
-                        {importing ? <Spinner /> : <Download className="h-4 w-4" />}
-                        {importing ? '讀取中…' : '帶入'}
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mt-3">
-                    <label htmlFor="contest_source_text" className="sr-only">
-                      比賽公告文字
-                    </label>
-                    <textarea
-                      id="contest_source_text"
-                      rows={5}
-                      value={sourceText}
-                      onChange={(event) => setSourceText(event.target.value)}
-                      placeholder={
-                        '把公告整段貼進來，例如：\n' +
-                        'WRO 2026 全國賽\n' +
-                        '比賽日期：115年8月20日\n' +
-                        '報名截止：115年7月31日\n' +
-                        '比賽地點：臺中市第二運動場'
-                      }
-                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-brand-500"
+              {importMode === 'url' ? (
+                <div className="mt-3">
+                  <label htmlFor="contest_source_url" className="sr-only">
+                    比賽公告網址
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    <input
+                      id="contest_source_url"
+                      type="url"
+                      value={sourceUrl}
+                      onChange={(event) => setSourceUrl(event.target.value)}
+                      placeholder="https://例如主辦單位的比賽公告頁"
+                      className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-brand-500"
                     />
                     <button
                       type="button"
-                      onClick={handleImportFromText}
-                      disabled={sourceText.trim() === ''}
-                      className="mt-2 inline-flex items-center gap-2 rounded-lg border border-brand-500 px-4 py-2 text-sm font-medium text-brand-600 transition hover:bg-brand-50 disabled:opacity-60"
+                      onClick={handleImportFromUrl}
+                      disabled={importing || sourceUrl.trim() === ''}
+                      className="inline-flex items-center gap-2 rounded-lg border border-brand-500 px-4 py-2 text-sm font-medium text-brand-600 transition hover:bg-brand-50 disabled:opacity-60"
                     >
-                      <Download className="h-4 w-4" />
-                      解析並帶入
+                      {importing ? <Spinner /> : <Download className="h-4 w-4" />}
+                      {importing ? '讀取中…' : '帶入'}
                     </button>
                   </div>
-                )}
-
-                {importNote && (
-                  <p role="status" className="mt-2 text-sm text-slate-600">
-                    {importNote}
-                  </p>
-                )}
-              </div>
-
-              <FormGroup step={1} title="基本資訊">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Field
-                    className="sm:col-span-2"
-                    id="contest_title"
-                    label="比賽名稱"
-                    required
-                  >
-                    <input
-                      id="contest_title"
-                      type="text"
-                      value={form.title}
-                      onChange={titleIme.onChange}
-                      onCompositionStart={titleIme.onCompositionStart}
-                      onCompositionEnd={titleIme.onCompositionEnd}
-                      placeholder="例如：WRO 2026 全國賽"
-                      className={INPUT_CLASS}
-                    />
-                  </Field>
-
-                  <Field id="contest_event_date" label="比賽日期" required>
-                    <input
-                      id="contest_event_date"
-                      type="date"
-                      value={form.event_date}
-                      onChange={(event) =>
-                        patch({ event_date: event.target.value })
-                      }
-                      className={INPUT_CLASS}
-                    />
-                  </Field>
-
-                  <Field
-                    id="contest_deadline"
-                    label="報名截止日"
-                    required
-                    hint="要早於或等於比賽日期"
-                  >
-                    <input
-                      id="contest_deadline"
-                      type="date"
-                      value={form.signup_deadline}
-                      onChange={(event) =>
-                        patch({ signup_deadline: event.target.value })
-                      }
-                      className={INPUT_CLASS}
-                    />
-                  </Field>
-
-                  <Field
-                    className="sm:col-span-2"
-                    id="contest_location"
-                    label="地點"
-                    required
-                  >
-                    <input
-                      id="contest_location"
-                      type="text"
-                      value={form.location}
-                      onChange={locationIme.onChange}
-                      onCompositionStart={locationIme.onCompositionStart}
-                      onCompositionEnd={locationIme.onCompositionEnd}
-                      placeholder="例如：臺北市立大學天母校區體育館"
-                      className={INPUT_CLASS}
-                    />
-                  </Field>
                 </div>
-              </FormGroup>
-
-              <FormGroup
-                step={2}
-                title="報名條件"
-                description="不符年級的孩子在家長端會直接標示「年級不符」，按不下報名。"
-              >
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Field id="contest_min_grade" label="最低年級" required>
-                    <select
-                      id="contest_min_grade"
-                      value={form.min_grade}
-                      onChange={(event) =>
-                        patch({ min_grade: event.target.value })
-                      }
-                      className={INPUT_CLASS}
-                    >
-                      {ALL_GRADES.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-
-                  <Field id="contest_max_grade" label="最高年級" required>
-                    <select
-                      id="contest_max_grade"
-                      value={form.max_grade}
-                      onChange={(event) =>
-                        patch({ max_grade: event.target.value })
-                      }
-                      className={INPUT_CLASS}
-                    >
-                      {ALL_GRADES.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-
-                  <Field
-                    id="contest_capacity"
-                    label="名額上限"
-                    hint="留空代表不限名額"
-                  >
-                    <input
-                      id="contest_capacity"
-                      type="number"
-                      min={1}
-                      value={form.capacity ?? ''}
-                      onChange={(event) =>
-                        patch({
-                          capacity:
-                            event.target.value === ''
-                              ? null
-                              : Number(event.target.value),
-                        })
-                      }
-                      placeholder="不限"
-                      className={INPUT_CLASS}
-                    />
-                  </Field>
-
-                  <Field
-                    id="contest_status"
-                    label="狀態"
-                    required
-                    hint="草稿只有後台看得到"
-                  >
-                    <select
-                      id="contest_status"
-                      value={form.status}
-                      onChange={(event) =>
-                        patch({ status: event.target.value as ContestStatus })
-                      }
-                      className={INPUT_CLASS}
-                    >
-                      {(Object.keys(CONTEST_STATUS_LABELS) as ContestStatus[]).map(
-                        (key) => (
-                          <option key={key} value={key}>
-                            {CONTEST_STATUS_LABELS[key]}
-                          </option>
-                        )
-                      )}
-                    </select>
-                  </Field>
-                </div>
-              </FormGroup>
-
-              <FormGroup step={3} title="說明">
-                <Field
-                  id="contest_description"
-                  label="給家長看的說明"
-                  hint="選填，會原樣顯示在比賽頁"
-                >
+              ) : (
+                <div className="mt-3">
+                  <label htmlFor="contest_source_text" className="sr-only">
+                    比賽公告文字
+                  </label>
                   <textarea
-                    id="contest_description"
-                    rows={4}
-                    value={form.description ?? ''}
-                    onChange={descriptionIme.onChange}
-                    onCompositionStart={descriptionIme.onCompositionStart}
-                    onCompositionEnd={descriptionIme.onCompositionEnd}
-                    placeholder="比賽規則、分組方式、費用、集合時間等"
+                    id="contest_source_text"
+                    rows={5}
+                    value={sourceText}
+                    onChange={(event) => setSourceText(event.target.value)}
+                    placeholder={
+                      '把公告整段貼進來，例如：\n' +
+                      'WRO 2026 全國賽\n' +
+                      '比賽日期：115年8月20日\n' +
+                      '報名截止：115年7月31日\n' +
+                      '比賽地點：臺中市第二運動場'
+                    }
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-brand-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleImportFromText}
+                    disabled={sourceText.trim() === ''}
+                    className="mt-2 inline-flex items-center gap-2 rounded-lg border border-brand-500 px-4 py-2 text-sm font-medium text-brand-600 transition hover:bg-brand-50 disabled:opacity-60"
+                  >
+                    <Download className="h-4 w-4" />
+                    解析並帶入
+                  </button>
+                </div>
+              )}
+
+              {importNote && (
+                <p role="status" className="mt-2 text-sm text-slate-600">
+                  {importNote}
+                </p>
+              )}
+            </div>
+
+            <FormGroup step={1} title="基本資訊">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field
+                  className="sm:col-span-2"
+                  id="contest_title"
+                  label="比賽名稱"
+                  required
+                >
+                  <input
+                    id="contest_title"
+                    type="text"
+                    value={form.title}
+                    onChange={titleIme.onChange}
+                    onCompositionStart={titleIme.onCompositionStart}
+                    onCompositionEnd={titleIme.onCompositionEnd}
+                    placeholder="例如：WRO 2026 全國賽"
                     className={INPUT_CLASS}
                   />
                 </Field>
-              </FormGroup>
-            </div>
 
-            {/* 錯誤訊息貼著送出鈕，不要丟到整頁最上面 ——
-                管理員按完儲存眼睛還停在按鈕附近 */}
-            <div className="border-t border-slate-100 px-5 py-4 sm:px-6">
-              {formError && (
-                <p
-                  role="alert"
-                  className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
+                <Field id="contest_event_date" label="比賽日期" required>
+                  <input
+                    id="contest_event_date"
+                    type="date"
+                    value={form.event_date}
+                    onChange={(event) =>
+                      patch({ event_date: event.target.value })
+                    }
+                    className={INPUT_CLASS}
+                  />
+                </Field>
+
+                <Field
+                  id="contest_deadline"
+                  label="報名截止日"
+                  required
+                  hint="要早於或等於比賽日期"
                 >
-                  {formError}
-                </p>
-              )}
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+                  <input
+                    id="contest_deadline"
+                    type="date"
+                    value={form.signup_deadline}
+                    onChange={(event) =>
+                      patch({ signup_deadline: event.target.value })
+                    }
+                    className={INPUT_CLASS}
+                  />
+                </Field>
+
+                <Field
+                  className="sm:col-span-2"
+                  id="contest_location"
+                  label="地點"
+                  required
                 >
-                  {saving && <Spinner />}
-                  {saving ? '儲存中…' : '儲存'}
-                </button>
-                <button
-                  type="button"
-                  onClick={closeForm}
-                  disabled={saving}
-                  className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-600 transition hover:bg-slate-50 disabled:opacity-60"
-                >
-                  取消
-                </button>
+                  <input
+                    id="contest_location"
+                    type="text"
+                    value={form.location}
+                    onChange={locationIme.onChange}
+                    onCompositionStart={locationIme.onCompositionStart}
+                    onCompositionEnd={locationIme.onCompositionEnd}
+                    placeholder="例如：臺北市立大學天母校區體育館"
+                    className={INPUT_CLASS}
+                  />
+                </Field>
               </div>
-            </div>
-          </section>
-        )}
+            </FormGroup>
 
-        {contests.length === 0 ? (
-          <p className="mt-6 rounded-2xl bg-white p-8 text-center text-slate-500 shadow-sm">
-            還沒有任何比賽
-          </p>
-        ) : (
-          <ul className="mt-6 space-y-4">
-            {contests.map((contest) => {
-              const count = taken.get(contest.id) ?? 0;
-              const busy = busyContestId === contest.id;
-              return (
-                <li
-                  key={contest.id}
-                  className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200/80"
+            <FormGroup
+              step={2}
+              title="報名條件"
+              description="不符年級的孩子在家長端會直接標示「年級不符」，按不下報名。"
+            >
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field id="contest_min_grade" label="最低年級" required>
+                  <select
+                    id="contest_min_grade"
+                    value={form.min_grade}
+                    onChange={(event) =>
+                      patch({ min_grade: event.target.value })
+                    }
+                    className={INPUT_CLASS}
+                  >
+                    {ALL_GRADES.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field id="contest_max_grade" label="最高年級" required>
+                  <select
+                    id="contest_max_grade"
+                    value={form.max_grade}
+                    onChange={(event) =>
+                      patch({ max_grade: event.target.value })
+                    }
+                    className={INPUT_CLASS}
+                  >
+                    {ALL_GRADES.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field
+                  id="contest_capacity"
+                  label="名額上限"
+                  hint="留空代表不限名額"
                 >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    {/* min-w-0：flex 子元素預設不肯縮到內容以下，少了它，
-                        主辦單位那種一長串的比賽名稱會把整張卡片撐破 */}
-                    <div className="min-w-0 flex-1 break-words">
-                      <h2 className="font-semibold text-slate-900">
-                        {contest.title}
-                      </h2>
-                      <p className="mt-1 text-sm text-slate-500">
-                        {contest.event_date} · {contest.location} · 報名截止{' '}
-                        {contest.signup_deadline}
-                      </p>
-                      <p className="mt-1 text-sm text-slate-500">
-                        {formatGrade(contest.min_grade)}至
-                        {formatGrade(contest.max_grade)} · 已報名 {count}
-                        {contest.capacity === null
-                          ? ' 人（不限名額）'
-                          : ` / ${contest.capacity} 人`}
-                      </p>
-                    </div>
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                        STATUS_STYLES[contest.status]
-                      }`}
-                    >
-                      {CONTEST_STATUS_LABELS[contest.status]}
-                    </span>
-                  </div>
+                  <input
+                    id="contest_capacity"
+                    type="number"
+                    min={1}
+                    value={form.capacity ?? ''}
+                    onChange={(event) =>
+                      patch({
+                        capacity:
+                          event.target.value === ''
+                            ? null
+                            : Number(event.target.value),
+                      })
+                    }
+                    placeholder="不限"
+                    className={INPUT_CLASS}
+                  />
+                </Field>
 
-                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                <Field
+                  id="contest_status"
+                  label="狀態"
+                  required
+                  hint="草稿只有後台看得到"
+                >
+                  <select
+                    id="contest_status"
+                    value={form.status}
+                    onChange={(event) =>
+                      patch({ status: event.target.value as ContestStatus })
+                    }
+                    className={INPUT_CLASS}
+                  >
+                    {(Object.keys(CONTEST_STATUS_LABELS) as ContestStatus[]).map(
+                      (key) => (
+                        <option key={key} value={key}>
+                          {CONTEST_STATUS_LABELS[key]}
+                        </option>
+                      )
+                    )}
+                  </select>
+                </Field>
+              </div>
+            </FormGroup>
+
+            <FormGroup step={3} title="說明">
+              <Field
+                id="contest_description"
+                label="給家長看的說明"
+                hint="選填，會原樣顯示在比賽頁"
+              >
+                <textarea
+                  id="contest_description"
+                  rows={4}
+                  value={form.description ?? ''}
+                  onChange={descriptionIme.onChange}
+                  onCompositionStart={descriptionIme.onCompositionStart}
+                  onCompositionEnd={descriptionIme.onCompositionEnd}
+                  placeholder="比賽規則、分組方式、費用、集合時間等"
+                  className={INPUT_CLASS}
+                />
+              </Field>
+            </FormGroup>
+          </div>
+
+          {/* 錯誤訊息貼著送出鈕，不要丟到整頁最上面 ——
+              管理員按完儲存眼睛還停在按鈕附近 */}
+          <div className="border-t border-slate-100 px-5 py-4 sm:px-6">
+            {formError && (
+              <p
+                role="alert"
+                className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
+              >
+                {formError}
+              </p>
+            )}
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving}
+                className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+              >
+                {saving && <Spinner />}
+                {saving ? '儲存中…' : '儲存'}
+              </button>
+              <button
+                type="button"
+                onClick={closeForm}
+                disabled={saving}
+                className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-600 transition hover:bg-slate-50 disabled:opacity-60"
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {contests.length === 0 ? (
+        <p className="mt-6 rounded-2xl bg-white p-8 text-center text-slate-500 shadow-sm">
+          還沒有任何比賽
+        </p>
+      ) : (
+        <ul className="mt-6 space-y-4">
+          {contests.map((contest) => {
+            const count = taken.get(contest.id) ?? 0;
+            const busy = busyContestId === contest.id;
+            return (
+              <li
+                key={contest.id}
+                className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200/80"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  {/* min-w-0：flex 子元素預設不肯縮到內容以下，少了它，
+                      主辦單位那種一長串的比賽名稱會把整張卡片撐破 */}
+                  <div className="min-w-0 flex-1 break-words">
+                    <h2 className="font-semibold text-slate-900">
+                      {contest.title}
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {contest.event_date} · {contest.location} · 報名截止{' '}
+                      {contest.signup_deadline}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-500">
+                      {formatGrade(contest.min_grade)}至
+                      {formatGrade(contest.max_grade)} · 已報名 {count}
+                      {contest.capacity === null
+                        ? ' 人（不限名額）'
+                        : ` / ${contest.capacity} 人`}
+                    </p>
+                  </div>
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                      STATUS_STYLES[contest.status]
+                    }`}
+                  >
+                    {CONTEST_STATUS_LABELS[contest.status]}
+                  </span>
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => toggleEntries(contest.id)}
+                    className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50"
+                  >
+                    {entriesFor === contest.id ? '收起名單' : '看報名名單'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => startEdit(contest)}
+                    className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50"
+                  >
+                    編輯
+                  </button>
+                  {/*
+                    預覽開新分頁，不要把後台的位置弄丟 —— 看完關掉分頁
+                    就回到原本捲動到的地方。走的是家長看到的同一頁，
+                    草稿也讀得到（列級權限只給管理員），所以看到的
+                    版面跟發佈後一模一樣。
+                  */}
+                  <a
+                    href={`/contests/${contest.id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50"
+                  >
+                    <Eye className="h-4 w-4" />
+                    預覽
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSharingId(
+                        sharingId === contest.id ? null : contest.id
+                      );
+                      setCopyNote('');
+                    }}
+                    className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50"
+                  >
+                    <Share2 className="h-4 w-4" />
+                    分享
+                  </button>
+                  {contest.status !== 'published' && (
                     <button
                       type="button"
-                      onClick={() => toggleEntries(contest.id)}
-                      className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50"
+                      onClick={() => handleChangeStatus(contest, 'published')}
+                      disabled={busy}
+                      className="inline-flex items-center gap-2 rounded-lg border border-brand-500 px-4 py-2 text-sm font-medium text-brand-600 transition hover:bg-brand-50 disabled:opacity-60"
                     >
-                      {entriesFor === contest.id ? '收起名單' : '看報名名單'}
+                      {busy && <Spinner />}
+                      發佈
                     </button>
+                  )}
+                  {contest.status === 'published' && (
                     <button
                       type="button"
-                      onClick={() => startEdit(contest)}
-                      className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50"
+                      onClick={() => handleChangeStatus(contest, 'closed')}
+                      disabled={busy}
+                      className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50 disabled:opacity-60"
                     >
-                      編輯
+                      {busy && <Spinner />}
+                      關閉報名
                     </button>
-                    {/*
-                      預覽開新分頁，不要把後台的位置弄丟 —— 看完關掉分頁
-                      就回到原本捲動到的地方。走的是家長看到的同一頁，
-                      草稿也讀得到（列級權限只給管理員），所以看到的
-                      版面跟發佈後一模一樣。
-                    */}
-                    <a
-                      href={`/contests/${contest.id}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50"
-                    >
-                      <Eye className="h-4 w-4" />
-                      預覽
-                    </a>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSharingId(
-                          sharingId === contest.id ? null : contest.id
-                        );
-                        setCopyNote('');
-                      }}
-                      className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50"
-                    >
-                      <Share2 className="h-4 w-4" />
-                      分享
-                    </button>
-                    {contest.status !== 'published' && (
+                  )}
+                  {confirmingDeleteId === contest.id ? (
+                    <>
                       <button
                         type="button"
-                        onClick={() => handleChangeStatus(contest, 'published')}
+                        onClick={() => handleDelete(contest.id)}
                         disabled={busy}
-                        className="inline-flex items-center gap-2 rounded-lg border border-brand-500 px-4 py-2 text-sm font-medium text-brand-600 transition hover:bg-brand-50 disabled:opacity-60"
+                        className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700 disabled:opacity-60"
                       >
                         {busy && <Spinner />}
-                        發佈
+                        確定刪除
                       </button>
-                    )}
-                    {contest.status === 'published' && (
                       <button
                         type="button"
-                        onClick={() => handleChangeStatus(contest, 'closed')}
+                        onClick={() => setConfirmingDeleteId(null)}
                         disabled={busy}
-                        className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50 disabled:opacity-60"
+                        className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50 disabled:opacity-60"
                       >
-                        {busy && <Spinner />}
-                        關閉報名
+                        取消
                       </button>
-                    )}
-                    {confirmingDeleteId === contest.id ? (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(contest.id)}
-                          disabled={busy}
-                          className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700 disabled:opacity-60"
-                        >
-                          {busy && <Spinner />}
-                          確定刪除
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setConfirmingDeleteId(null)}
-                          disabled={busy}
-                          className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50 disabled:opacity-60"
-                        >
-                          取消
-                        </button>
-                        <span className="text-sm text-red-700">
-                          {count > 0
-                            ? `這場比賽有 ${count} 筆報名，會一併刪除`
-                            : '刪除後無法復原'}
-                        </span>
-                      </>
+                      <span className="text-sm text-red-700">
+                        {count > 0
+                          ? `這場比賽有 ${count} 筆報名，會一併刪除`
+                          : '刪除後無法復原'}
+                      </span>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmingDeleteId(contest.id)}
+                      className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50"
+                    >
+                      刪除
+                    </button>
+                  )}
+                </div>
+
+                {sharingId === contest.id && (
+                  <SharePanel
+                    contest={contest}
+                    copyNote={copyNote}
+                    onCopy={handleCopy}
+                  />
+                )}
+
+                {entriesFor === contest.id && (
+                  <div className="mt-4 border-t border-slate-100 pt-4">
+                    {loadingEntries ? (
+                      <p className="flex items-center gap-2 text-sm text-slate-500">
+                        <Spinner />
+                        正在讀取名單…
+                      </p>
+                    ) : entries.length === 0 ? (
+                      <p className="text-sm text-slate-500">還沒有人報名</p>
                     ) : (
-                      <button
-                        type="button"
-                        onClick={() => setConfirmingDeleteId(contest.id)}
-                        className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50"
-                      >
-                        刪除
-                      </button>
+                      <ul className="space-y-2">
+                        {entries.map((entry) => (
+                          <li
+                            key={entry.id}
+                            className="flex flex-wrap items-center gap-3 rounded-lg bg-slate-50 px-3 py-2"
+                          >
+                            <span className="font-medium text-slate-800">
+                              {entry.student_name}
+                            </span>
+                            <span className="text-sm text-slate-500">
+                              {formatGrade(entry.grade)}
+                            </span>
+                            <StatusBadge status={entry.status} />
+                            <div className="ml-auto flex items-center gap-2">
+                              {busyEntryId === entry.id && (
+                                <Spinner className="h-4 w-4 text-slate-400" />
+                              )}
+                              <select
+                                value={entry.status}
+                                disabled={busyEntryId === entry.id}
+                                onChange={(event) =>
+                                  handleEntryStatus(
+                                    entry,
+                                    event.target.value as RegistrationStatus
+                                  )
+                                }
+                                aria-label={`${entry.student_name} 的狀態`}
+                                className="rounded-lg border border-slate-300 px-2 py-1 text-sm disabled:opacity-60"
+                              >
+                                {(
+                                  Object.keys(
+                                    STATUS_LABELS
+                                  ) as RegistrationStatus[]
+                                ).map((key) => (
+                                  <option key={key} value={key}>
+                                    {STATUS_LABELS[key]}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
                     )}
                   </div>
-
-                  {sharingId === contest.id && (
-                    <SharePanel
-                      contest={contest}
-                      copyNote={copyNote}
-                      onCopy={handleCopy}
-                    />
-                  )}
-
-                  {entriesFor === contest.id && (
-                    <div className="mt-4 border-t border-slate-100 pt-4">
-                      {loadingEntries ? (
-                        <p className="flex items-center gap-2 text-sm text-slate-500">
-                          <Spinner />
-                          正在讀取名單…
-                        </p>
-                      ) : entries.length === 0 ? (
-                        <p className="text-sm text-slate-500">還沒有人報名</p>
-                      ) : (
-                        <ul className="space-y-2">
-                          {entries.map((entry) => (
-                            <li
-                              key={entry.id}
-                              className="flex flex-wrap items-center gap-3 rounded-lg bg-slate-50 px-3 py-2"
-                            >
-                              <span className="font-medium text-slate-800">
-                                {entry.student_name}
-                              </span>
-                              <span className="text-sm text-slate-500">
-                                {formatGrade(entry.grade)}
-                              </span>
-                              <StatusBadge status={entry.status} />
-                              <div className="ml-auto flex items-center gap-2">
-                                {busyEntryId === entry.id && (
-                                  <Spinner className="h-4 w-4 text-slate-400" />
-                                )}
-                                <select
-                                  value={entry.status}
-                                  disabled={busyEntryId === entry.id}
-                                  onChange={(event) =>
-                                    handleEntryStatus(
-                                      entry,
-                                      event.target.value as RegistrationStatus
-                                    )
-                                  }
-                                  aria-label={`${entry.student_name} 的狀態`}
-                                  className="rounded-lg border border-slate-300 px-2 py-1 text-sm disabled:opacity-60"
-                                >
-                                  {(
-                                    Object.keys(
-                                      STATUS_LABELS
-                                    ) as RegistrationStatus[]
-                                  ).map((key) => (
-                                    <option key={key} value={key}>
-                                      {STATUS_LABELS[key]}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }

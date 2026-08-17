@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { Download } from 'lucide-react';
-import AppHeader from '../components/AppHeader';
 import RegistrationFilters from '../components/admin/RegistrationFilters';
 import RegistrationTable from '../components/admin/RegistrationTable';
 import RegistrationDetail from '../components/admin/RegistrationDetail';
@@ -104,92 +102,82 @@ export default function AdminPage() {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <AppHeader />
-      <div className="mx-auto max-w-7xl px-4 py-8">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <h1 className="text-2xl font-bold text-slate-900">報名管理</h1>
-          <div className="flex flex-wrap items-center gap-3">
-            <Link
-              to="/admin/contests"
-              className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-white"
-            >
-              比賽管理
-            </Link>
-            <button
-              type="button"
-              onClick={handleExport}
-              className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-            >
-              <Download className="h-4 w-4" />
-              匯出 CSV
-            </button>
-          </div>
-        </div>
+    <div className="mx-auto max-w-7xl px-4 py-8">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="text-2xl font-bold text-slate-900">報名管理</h1>
+        {/* 換頁的入口都在側邊欄，這裡只留對「這一頁」做的事 */}
+        <button
+          type="button"
+          onClick={handleExport}
+          className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+        >
+          <Download className="h-4 w-4" />
+          匯出 CSV
+        </button>
+      </div>
 
-        {/* 匯出時備註讀取失敗要在畫面顯示，不能只留在主控台的
-            console.error —— 行政人員完全不知道 CSV 的備註欄其實不完整。
-            用跟撤回／存檔失敗一致的 role="alert" 呈現。 */}
-        {exportWarning && (
-          <p
-            role="alert"
-            className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
-          >
-            {exportWarning}
+      {/* 匯出時備註讀取失敗要在畫面顯示，不能只留在主控台的
+          console.error —— 行政人員完全不知道 CSV 的備註欄其實不完整。
+          用跟撤回／存檔失敗一致的 role="alert" 呈現。 */}
+      {exportWarning && (
+        <p
+          role="alert"
+          className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
+        >
+          {exportWarning}
+        </p>
+      )}
+
+      <div className="mt-6">
+        <StatsCards stats={stats} />
+      </div>
+
+      <div className="mt-4">
+        <RegistrationFilters value={filters} onChange={handleFiltersChange} />
+      </div>
+
+      <div className="mt-4">
+        {loading ? (
+          <p className="rounded-2xl bg-white p-8 text-center text-slate-500 shadow-sm">
+            載入中…
           </p>
-        )}
-
-        <div className="mt-6">
-          <StatsCards stats={stats} />
-        </div>
-
-        <div className="mt-4">
-          <RegistrationFilters value={filters} onChange={handleFiltersChange} />
-        </div>
-
-        <div className="mt-4">
-          {loading ? (
-            <p className="rounded-2xl bg-white p-8 text-center text-slate-500 shadow-sm">
-              載入中…
-            </p>
-          ) : (
-            <RegistrationTable rows={rows} onSelect={handleSelect} />
-          )}
-        </div>
-
-        {total > PAGE_SIZE && (
-          <div className="mt-4 flex items-center justify-center gap-4">
-            <button
-              type="button"
-              disabled={page === 0}
-              onClick={() => setPage((current) => current - 1)}
-              className="rounded-lg border border-slate-300 px-4 py-2 text-sm disabled:opacity-40"
-            >
-              上一頁
-            </button>
-            <span className="text-sm text-slate-500">
-              第 {page + 1} / {totalPages} 頁，共 {total} 筆
-            </span>
-            <button
-              type="button"
-              disabled={page + 1 >= totalPages}
-              onClick={() => setPage((current) => current + 1)}
-              className="rounded-lg border border-slate-300 px-4 py-2 text-sm disabled:opacity-40"
-            >
-              下一頁
-            </button>
-          </div>
-        )}
-
-        {selected && (
-          <RegistrationDetail
-            registration={selected}
-            onClose={handleCloseDetail}
-            onSaved={handleSaved}
-            error={saveError}
-          />
+        ) : (
+          <RegistrationTable rows={rows} onSelect={handleSelect} />
         )}
       </div>
+
+      {total > PAGE_SIZE && (
+        <div className="mt-4 flex items-center justify-center gap-4">
+          <button
+            type="button"
+            disabled={page === 0}
+            onClick={() => setPage((current) => current - 1)}
+            className="rounded-lg border border-slate-300 px-4 py-2 text-sm disabled:opacity-40"
+          >
+            上一頁
+          </button>
+          <span className="text-sm text-slate-500">
+            第 {page + 1} / {totalPages} 頁，共 {total} 筆
+          </span>
+          <button
+            type="button"
+            disabled={page + 1 >= totalPages}
+            onClick={() => setPage((current) => current + 1)}
+            className="rounded-lg border border-slate-300 px-4 py-2 text-sm disabled:opacity-40"
+          >
+            下一頁
+          </button>
+        </div>
+      )}
+
+      {selected && (
+        <RegistrationDetail
+          registration={selected}
+          onClose={handleCloseDetail}
+          onSaved={handleSaved}
+          error={saveError}
+        />
+      )}
     </div>
   );
 }
