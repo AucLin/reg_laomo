@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import AppHeader from '../components/AppHeader';
 import StatusBadge from '../components/StatusBadge';
+import Spinner, { PageLoading } from '../components/Spinner';
 import {
   cancelMyEntry,
   enterContest,
@@ -21,6 +22,8 @@ import {
 
 export default function ContestsPage() {
   const { user } = useAuth();
+  // 帶了代碼就是從分享連結進來的，只顯示那一場
+  const { contestId } = useParams();
   const [contests, setContests] = useState<Contest[]>([]);
   const [taken, setTaken] = useState<Map<string, number>>(new Map());
   const [students, setStudents] = useState<StudentWithSchool[]>([]);
@@ -32,6 +35,12 @@ export default function ContestsPage() {
   const [message, setMessage] = useState<{ contestId: string; text: string } | null>(
     null
   );
+  // 哪一場比賽正在等報名或取消的回應
+  const [busyContestId, setBusyContestId] = useState<string | null>(null);
+
+  const shown = contestId
+    ? contests.filter((item) => item.id === contestId)
+    : contests;
 
   useEffect(() => {
     let active = true;
@@ -75,18 +84,22 @@ export default function ContestsPage() {
     });
   }
 
-  async function handleEnter(contestId: string, studentId: string) {
-    const { error } = await enterContest(contestId, studentId);
+  async function handleEnter(id: string, studentId: string) {
+    setBusyContestId(id);
+    const { error } = await enterContest(id, studentId);
     if (error) {
-      setMessage({ contestId, text: error });
+      setBusyContestId(null);
+      setMessage({ contestId: id, text: error });
       return;
     }
     setMessage(null);
     setPickerFor(null);
-    await refreshAfterChange(contestId);
+    await refreshAfterChange(id);
+    setBusyContestId(null);
   }
 
   async function handleCancel(entry: ContestEntry) {
+    setBusyContestId(entry.contest_id);
     const { error } = await cancelMyEntry(entry.id);
     if (error) {
       setMessage({ contestId: entry.contest_id, text: error });
@@ -94,13 +107,14 @@ export default function ContestsPage() {
       setMessage(null);
     }
     await refreshAfterChange(entry.contest_id);
+    setBusyContestId(null);
   }
 
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50">
         <AppHeader />
-        <div className="p-8 text-center text-slate-500">載入中…</div>
+        <PageLoading label="正在讀取比賽…" />
       </div>
     );
   }
@@ -111,13 +125,22 @@ export default function ContestsPage() {
       <div className="mx-auto max-w-3xl px-4 py-8 sm:py-12">
         <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">比賽報名</h1>
 
-        {contests.length === 0 ? (
+        {contestId && (
+          <Link to="/contests" className="mt-2 inline-block text-sm text-brand-600 underline">
+            看全部比賽
+          </Link>
+        )}
+
+        {shown.length === 0 ? (
           <p className="mt-6 rounded-2xl bg-white p-8 text-center text-slate-500 shadow-sm">
-            目前沒有開放報名的比賽
+            {/* 分享連結指到草稿或已刪除的比賽時，家長會落到這裡 */}
+            {contestId
+              ? '找不到這場比賽，可能尚未開放或已經結束'
+              : '目前沒有開放報名的比賽'}
           </p>
         ) : (
           <ul className="mt-6 space-y-4">
-            {contests.map((contest) => {
+            {shown.map((contest) => {
               const count = taken.get(contest.id) ?? 0;
               const full =
                 contest.capacity !== null && count >= contest.capacity;
@@ -207,8 +230,10 @@ export default function ContestsPage() {
                         <button
                           type="button"
                           onClick={() => handleCancel(myEntry)}
-                          className="ml-auto rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-600 transition hover:bg-white"
+                          disabled={busyContestId === contest.id}
+                          className="ml-auto inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-600 transition hover:bg-white disabled:opacity-60"
                         >
+                          {busyContestId === contest.id && <Spinner />}
                           取消報名
                         </button>
                       )}
@@ -286,8 +311,10 @@ export default function ContestsPage() {
                                     onClick={() =>
                                       handleEnter(contest.id, student.id)
                                     }
-                                    className="ml-auto rounded-lg bg-brand-600 px-4 py-1.5 text-sm font-medium text-white transition hover:bg-brand-700"
+                                    disabled={busyContestId === contest.id}
+                                    className="ml-auto inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-1.5 text-sm font-medium text-white transition hover:bg-brand-700 disabled:opacity-60"
                                   >
+                                    {busyContestId === contest.id && <Spinner />}
                                     報名
                                   </button>
                                 ) : (

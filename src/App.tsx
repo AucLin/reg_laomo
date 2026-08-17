@@ -36,6 +36,8 @@ export default function App() {
           />
           {/* 比賽清單不設路由守衛：未登入的訪客也要看得到，這是招生素材 */}
           <Route path="/contests" element={<ContestsPage />} />
+          {/* 分享出去的單場比賽連結 */}
+          <Route path="/contests/:contestId" element={<ContestsPage />} />
           <Route
             path="/admin"
             element={

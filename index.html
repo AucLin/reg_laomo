@@ -5,6 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>老莫機器人教育中心</title>
     <meta name="description" content="老莫機器人教育中心線上報名系統" />
+
+    <!--
+      分享到 LINE 或臉書時的預覽。這是整站共用的一份 —— 單場比賽的
+      連結貼出去，預覽標題一樣是中心名稱，因為這是純前端的單頁應用，
+      伺服器端不會針對每個網址產生不同的標籤。要做到「每場比賽有自己的
+      預覽圖與標題」得改成伺服器端渲染或預先產生靜態頁，目前不值得。
+    -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="老莫機器人教育中心" />
+    <meta property="og:title" content="老莫機器人教育中心" />
+    <meta
+      property="og:description"
+      content="機器人課程與比賽報名。動手做中學，從積木式程式到文字程式，循序漸進。"
+    />
+    <meta property="og:locale" content="zh_TW" />
   </head>
   <body>
     <div id="root"></div>

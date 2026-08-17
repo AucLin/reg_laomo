@@ -5,6 +5,12 @@
 [build.environment]
   NODE_VERSION = "22"
 
+# 這條要排在萬用規則前面，否則 /api/* 會被 SPA 的 catch-all 吃掉
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
