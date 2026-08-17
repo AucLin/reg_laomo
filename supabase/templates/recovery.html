@@ -1,0 +1,23 @@
+<h2>重設密碼</h2>
+
+<p>您好，我們收到了重設密碼的要求。</p>
+
+<p>請點選下面的連結設定新密碼，連結在一小時內有效：</p>
+
+<p>
+  <a href="{{ .ConfirmationURL }}"
+     style="display:inline-block;padding:12px 24px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;">
+    設定新密碼
+  </a>
+</p>
+
+<p style="color:#64748b;font-size:14px;">
+  如果按鈕沒有反應，請複製下面的網址貼到瀏覽器：<br>
+  {{ .ConfirmationURL }}
+</p>
+
+<hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;">
+
+<p style="color:#64748b;font-size:14px;">
+  如果這不是您本人的操作，請忽略這封信，您的密碼不會有任何變動。
+</p>

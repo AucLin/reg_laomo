@@ -1,0 +1,23 @@
+<h2>確認新的信箱地址</h2>
+
+<p>您好，我們收到了將帳號信箱從 {{ .Email }} 變更為 {{ .NewEmail }} 的要求。</p>
+
+<p>請點選下面的連結完成確認：</p>
+
+<p>
+  <a href="{{ .ConfirmationURL }}"
+     style="display:inline-block;padding:12px 24px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;">
+    確認變更
+  </a>
+</p>
+
+<p style="color:#64748b;font-size:14px;">
+  如果按鈕沒有反應，請複製下面的網址貼到瀏覽器：<br>
+  {{ .ConfirmationURL }}
+</p>
+
+<hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;">
+
+<p style="color:#64748b;font-size:14px;">
+  如果這不是您本人的操作，請立即聯絡老莫機器人教育中心。
+</p>
