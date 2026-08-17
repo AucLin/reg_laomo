@@ -35,6 +35,7 @@ describe('SchoolSelector', () => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.spyOn(schoolsModule, 'searchSchools').mockResolvedValue(sampleSchools);
+    vi.spyOn(schoolsModule, 'searchOtherLevels').mockResolvedValue([]);
     vi.spyOn(schoolsModule, 'getSchoolById').mockResolvedValue(sampleSchools[0]);
   });
 
@@ -278,6 +279,75 @@ describe('SchoolSelector', () => {
       expect(schoolsModule.searchSchools).toHaveBeenCalledWith(
         expect.objectContaining({ cities: [] })
       );
+    });
+  });
+
+  /*
+    教育部名錄只收獨立立案的學校，一貫制私校的國小部多半只以高中身分
+    登錄一筆。家長在國小級別搜「康橋」什麼都沒有，第一反應是系統壞了。
+  */
+  describe('同名學校掛在其他級別時的提示', () => {
+    const kangchiaoSenior = {
+      id: 'school-9',
+      code: '11302',
+      name: '私立康橋高中',
+      level: 'senior' as const,
+      city: '新北市',
+      address: null,
+      phone: null,
+    };
+
+    it('這個級別查無結果時，告知同名學校登錄在哪個級別', async () => {
+      vi.spyOn(schoolsModule, 'searchSchools').mockResolvedValue([]);
+      vi.spyOn(schoolsModule, 'searchOtherLevels').mockResolvedValue([
+        kangchiaoSenior,
+      ]);
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<SchoolSelector value={emptySelection} onChange={vi.fn()} />);
+
+      await user.type(screen.getByLabelText('搜尋學校名稱'), '康橋');
+      vi.advanceTimersByTime(250);
+
+      await waitFor(() => {
+        expect(screen.getByText(/登錄在其他級別/)).toBeInTheDocument();
+      });
+      expect(screen.getByText(/私立康橋高中/)).toBeInTheDocument();
+      // 「高中職」也是級別按鈕的文字，這裡要比對括號版本才不會抓錯元素
+      expect(screen.getByText('（高中職）')).toBeInTheDocument();
+      // 光說「有這所學校」不夠，要直接指路到自由填寫的出口
+      expect(
+        screen.getByRole('button', { name: '找不到我的學校' })
+      ).toBeInTheDocument();
+    });
+
+    it('這個級別找得到學校時不去問其他級別，省一次查詢', async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<SchoolSelector value={emptySelection} onChange={vi.fn()} />);
+
+      await user.type(screen.getByLabelText('搜尋學校名稱'), '中正');
+      vi.advanceTimersByTime(250);
+
+      await waitFor(() => {
+        expect(schoolsModule.searchSchools).toHaveBeenCalled();
+      });
+      expect(schoolsModule.searchOtherLevels).not.toHaveBeenCalled();
+    });
+
+    it('其他級別也沒有同名學校時，不顯示多餘的提示', async () => {
+      vi.spyOn(schoolsModule, 'searchSchools').mockResolvedValue([]);
+      vi.spyOn(schoolsModule, 'searchOtherLevels').mockResolvedValue([]);
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<SchoolSelector value={emptySelection} onChange={vi.fn()} />);
+
+      await user.type(screen.getByLabelText('搜尋學校名稱'), '不存在的學校');
+      vi.advanceTimersByTime(250);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText('找不到符合的學校，試試放寬縣市範圍')
+        ).toBeInTheDocument();
+      });
+      expect(screen.queryByText(/登錄在其他級別/)).not.toBeInTheDocument();
     });
   });
 });

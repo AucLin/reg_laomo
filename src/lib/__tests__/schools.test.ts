@@ -1,9 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { searchSchools, SEARCH_LIMIT } from '../schools';
+import {
+  searchSchools,
+  searchOtherLevels,
+  SEARCH_LIMIT,
+  OTHER_LEVEL_HINT_LIMIT,
+} from '../schools';
 
 const builder = {
   select: vi.fn(),
   eq: vi.fn(),
+  neq: vi.fn(),
   in: vi.fn(),
   ilike: vi.fn(),
   order: vi.fn(),
@@ -67,6 +73,64 @@ describe('searchSchools', () => {
     const result = await searchSchools({
       level: 'elementary',
       keyword: '中',
+      cities: [],
+    });
+    expect(result).toEqual([]);
+  });
+});
+
+/*
+  教育部名錄只收獨立立案的學校。雙北登錄了 50 所私立高中，私立國小
+  卻只有 11 所 —— 一貫制學校的國小部多半只以高中身分登錄一筆。
+  家長在國小級別搜「康橋」什麼都沒有，會以為系統壞了，而不是去點
+  「找不到我的學校」。這個查詢就是為了在那一刻告訴他實際情況。
+*/
+describe('searchOtherLevels', () => {
+  beforeEach(() => {
+    for (const key of Object.keys(builder) as (keyof typeof builder)[]) {
+      builder[key].mockClear();
+      builder[key].mockReturnValue(builder);
+    }
+    builder.limit.mockResolvedValue({ data: [], error: null });
+  });
+
+  it('排除目前這個級別，只找其他級別', async () => {
+    await searchOtherLevels({ level: 'elementary', keyword: '康橋', cities: [] });
+    expect(builder.neq).toHaveBeenCalledWith('level', 'elementary');
+  });
+
+  it('沒有關鍵字時不查詢，直接回空陣列', async () => {
+    // 家長還沒開始打字，跳出「其他級別有這些學校」毫無意義
+    const result = await searchOtherLevels({
+      level: 'elementary',
+      keyword: '   ',
+      cities: [],
+    });
+    expect(result).toEqual([]);
+    expect(builder.ilike).not.toHaveBeenCalled();
+  });
+
+  it('沿用家長設定的縣市範圍', async () => {
+    // 縣市不一致的話，畫面會出現「你的搜尋範圍找不到，但別的縣市有」
+    // 這種更難理解的提示
+    await searchOtherLevels({
+      level: 'elementary',
+      keyword: '康橋',
+      cities: ['新北市'],
+    });
+    expect(builder.in).toHaveBeenCalledWith('city', ['新北市']);
+  });
+
+  it('只取少量結果，這是提示不是搜尋結果', async () => {
+    await searchOtherLevels({ level: 'elementary', keyword: '康橋', cities: [] });
+    expect(builder.limit).toHaveBeenCalledWith(OTHER_LEVEL_HINT_LIMIT);
+  });
+
+  it('查詢出錯時回空陣列，不影響原本的報名流程', async () => {
+    builder.limit.mockResolvedValue({ data: null, error: { message: '壞了' } });
+    const result = await searchOtherLevels({
+      level: 'elementary',
+      keyword: '康橋',
       cities: [],
     });
     expect(result).toEqual([]);

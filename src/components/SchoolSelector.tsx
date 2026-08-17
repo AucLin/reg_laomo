@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Search, X } from 'lucide-react';
-import { getSchoolById, searchSchools } from '../lib/schools';
+import { getSchoolById, searchOtherLevels, searchSchools } from '../lib/schools';
 import {
   SCHOOL_LEVEL_LABELS,
   DEFAULT_CITIES,
@@ -51,6 +51,14 @@ export default function SchoolSelector({ value, onChange }: Props) {
   const [cities, setCities] = useState<string[]>(DEFAULT_CITIES);
   const [keyword, setKeyword] = useState('');
   const [results, setResults] = useState<School[]>([]);
+  /*
+    目前級別找不到，但其他級別有同名學校時的提示。
+
+    教育部名錄只收獨立立案的學校，一貫制私校的國小部多半只以高中身分
+    登錄一筆。家長在國小級別搜「康橋」什麼都沒有，第一反應是系統壞了，
+    而不是去點下面的「找不到我的學校」。
+  */
+  const [otherLevelHints, setOtherLevelHints] = useState<School[]>([]);
   const [selected, setSelected] = useState<School | null>(null);
   const [manualMode, setManualMode] = useState(value.schoolNameRaw !== '');
   const [searching, setSearching] = useState(false);
@@ -96,7 +104,20 @@ export default function SchoolSelector({ value, onChange }: Props) {
     const timer = setTimeout(() => {
       setSearching(true);
       searchSchools({ level: value.level, keyword, cities })
-        .then(setResults)
+        .then(async (found) => {
+          setResults(found);
+          /*
+            只有在這個級別真的查不到時才去問其他級別。查得到就不必問，
+            省一次資料庫查詢 —— 這是絕大多數的情況。
+          */
+          if (found.length > 0 || keyword.trim() === '') {
+            setOtherLevelHints([]);
+            return;
+          }
+          setOtherLevelHints(
+            await searchOtherLevels({ level: value.level, keyword, cities })
+          );
+        })
         .finally(() => setSearching(false));
     }, DEBOUNCE_MS);
 
@@ -263,6 +284,33 @@ export default function SchoolSelector({ value, onChange }: Props) {
               {!searching && results.length === 0 && keyword !== '' && (
                 <li className="px-4 py-3 text-sm text-slate-400">
                   找不到符合的學校，試試放寬縣市範圍
+                </li>
+              )}
+              {/*
+                名錄裡有同名學校、只是掛在別的級別。直接告訴家長實際情況，
+                否則他只會看到「找不到」，不會意識到該走自由填寫那條路。
+              */}
+              {!searching && otherLevelHints.length > 0 && (
+                <li className="border-t border-slate-100 bg-amber-50 px-4 py-3">
+                  <p className="text-sm text-amber-900">
+                    名錄裡有這些同名學校，但登錄在其他級別：
+                  </p>
+                  <ul className="mt-1.5 space-y-1">
+                    {otherLevelHints.map((school) => (
+                      <li key={school.id} className="text-sm text-amber-800">
+                        · {school.name}
+                        <span className="ml-1 text-amber-600">
+                          （{SCHOOL_LEVEL_LABELS[school.level]}）
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-2 text-xs text-amber-700">
+                    許多私立學校是一貫制，教育部名錄只登錄其中一個級別。
+                    孩子若就讀的是這所學校的
+                    {SCHOOL_LEVEL_LABELS[value.level]}部，請用下面的
+                    「找不到我的學校」填寫校名。
+                  </p>
                 </li>
               )}
               {/* 這個出口是必要的：實驗教育機構、境外臺校不在教育部名錄裡，
