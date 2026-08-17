@@ -50,13 +50,25 @@ CREATE INDEX IF NOT EXISTS registrations_student_idx ON registrations (student_i
   這個判定不完美（同名同生日的雙胞胎會被合併成一個），但目前資料量是
   1 筆，且合併後家長在「我的孩子」看得到、可以自己補上第二個孩子。
   用更嚴格的判定反而會把同一個孩子拆成兩個 —— 那才是家長不會發現的錯誤。
+
+  WHERE NOT EXISTS 是冪等防護：這個檔案若被重跑，同一組（家長、姓名、
+  生日）已經有對應的學生時就不再重複插入。少了這段防護，重跑會讓
+  DISTINCT ON 對同一組資料再插入一筆一模一樣的孩子，下面的回填
+  UPDATE 在多筆同名同生日之中挑哪一筆是未定義行為 —— 不會報錯，
+  但會靜默造成資料重複與錯配。
 */
 INSERT INTO students
   (parent_id, name, gender, birthday, school_id, school_name_raw, grade, class_name)
 SELECT DISTINCT ON (parent_id, student_name, student_birthday)
   parent_id, student_name, student_gender, student_birthday,
   school_id, school_name_raw, grade, class_name
-FROM registrations
+FROM registrations r
+WHERE NOT EXISTS (
+  SELECT 1 FROM students s
+  WHERE s.parent_id = r.parent_id
+    AND s.name = r.student_name
+    AND s.birthday = r.student_birthday
+)
 ORDER BY parent_id, student_name, student_birthday, created_at DESC;
 
 UPDATE registrations r
@@ -92,9 +104,17 @@ LEFT JOIN schools s ON s.id = r.school_id;
 /*
   欄位凍結觸發器加上 student_id。
 
-  少了這一行，管理員可以把一筆報名改掛到別的孩子身上 —— 那等同於偽造
-  報名紀錄的歸屬。整個函式沿用 20260816100002 的原始定義，只在判斷式
-  尾端多一個欄位。
+  這個函式已經被改過三次：20260816100002 建立、20260816100004 補上
+  created_at、id 的欄位保護、20260817100000 把例外訊息改成「僅能變更
+  狀態」（admin_note 拆到 registration_notes 之後，「內部備註」四字
+  已不準確）。CREATE OR REPLACE FUNCTION 會安靜覆蓋現有版本，不會有
+  任何錯誤或警告 —— 這裡的基準必須是最新的 20260817100000，取錯版本
+  （例如誤用最早那份 20260816100002）會在不知不覺間把已經修好的
+  created_at／id 竄改漏洞重新打開。後人若要再改這個函式，請先確認
+  自己拿的是哪一版。
+
+  少了 student_id 這一行，管理員可以把一筆報名改掛到別的孩子身上 ——
+  那等同於偽造報名紀錄的歸屬。
 */
 CREATE OR REPLACE FUNCTION guard_registration_fields()
 RETURNS trigger
@@ -108,7 +128,8 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  -- 其餘情況（即管理員修改）只准動 status
+  -- 其餘情況（即管理員修改）只准動 status；內部備註已搬到
+  -- registration_notes，改備註是另一張表的 UPDATE，不受這個觸發器管轄
   IF NEW.student_name IS DISTINCT FROM OLD.student_name
      OR NEW.student_gender IS DISTINCT FROM OLD.student_gender
      OR NEW.student_birthday IS DISTINCT FROM OLD.student_birthday
@@ -120,9 +141,11 @@ BEGIN
      OR NEW.relation IS DISTINCT FROM OLD.relation
      OR NEW.contact_phone IS DISTINCT FROM OLD.contact_phone
      OR NEW.parent_id IS DISTINCT FROM OLD.parent_id
+     OR NEW.created_at IS DISTINCT FROM OLD.created_at
+     OR NEW.id IS DISTINCT FROM OLD.id
      OR NEW.student_id IS DISTINCT FROM OLD.student_id
   THEN
-    RAISE EXCEPTION '不可修改家長填寫的報名內容，僅能變更狀態與內部備註';
+    RAISE EXCEPTION '不可修改家長填寫的報名內容，僅能變更狀態';
   END IF;
 
   RETURN NEW;
