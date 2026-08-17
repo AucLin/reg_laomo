@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Download } from 'lucide-react';
 import AppHeader from '../components/AppHeader';
 import RegistrationFilters from '../components/admin/RegistrationFilters';
@@ -108,14 +109,22 @@ export default function AdminPage() {
       <div className="mx-auto max-w-7xl px-4 py-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <h1 className="text-2xl font-bold text-slate-900">報名管理</h1>
-          <button
-            type="button"
-            onClick={handleExport}
-            className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-          >
-            <Download className="h-4 w-4" />
-            匯出 CSV
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <Link
+              to="/admin/contests"
+              className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-white"
+            >
+              比賽管理
+            </Link>
+            <button
+              type="button"
+              onClick={handleExport}
+              className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+            >
+              <Download className="h-4 w-4" />
+              匯出 CSV
+            </button>
+          </div>
         </div>
 
         {/* 匯出時備註讀取失敗要在畫面顯示，不能只留在主控台的

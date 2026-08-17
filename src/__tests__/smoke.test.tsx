@@ -13,6 +13,12 @@ vi.mock('../lib/supabase', () => ({
   },
 }));
 
+// 進入頁掛載時會讀比賽清單，上面的 supabase 假物件只有 auth，
+// 沒有 from()，不擋下來會在測試結束後才丟出未處理的錯誤
+vi.mock('../lib/contests', () => ({
+  listOpenContests: () => Promise.resolve([]),
+}));
+
 describe('App', () => {
   it('進入頁顯示教育中心名稱', async () => {
     render(<App />);

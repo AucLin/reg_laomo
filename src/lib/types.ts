@@ -120,6 +120,46 @@ export interface AdminRegistrationRow extends RegistrationWithSchool {
   admin_note: string | null | undefined;
 }
 
+export type ContestStatus = 'draft' | 'published' | 'closed';
+
+export interface Contest {
+  id: string;
+  title: string;
+  description: string | null;
+  event_date: string;
+  location: string;
+  signup_deadline: string;
+  /** null 代表不限名額 */
+  capacity: number | null;
+  min_grade: string;
+  max_grade: string;
+  status: ContestStatus;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** 比賽報名。狀態與課程報名共用同一組，後台的狀態徽章可以直接重用。 */
+export interface ContestEntry {
+  id: string;
+  contest_id: string;
+  student_id: string;
+  parent_id: string;
+  /** 報名當下的快照，孩子之後升年級或改名都不會動到這裡 */
+  grade: string;
+  student_name: string;
+  status: RegistrationStatus;
+  admin_note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export const CONTEST_STATUS_LABELS: Record<ContestStatus, string> = {
+  draft: '草稿',
+  published: '報名中',
+  closed: '已關閉',
+};
+
 export const SCHOOL_LEVEL_LABELS: Record<SchoolLevel, string> = {
   elementary: '國小',
   junior: '國中',

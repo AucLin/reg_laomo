@@ -7,6 +7,8 @@ import RegisterPage from './pages/RegisterPage';
 import ApplyPage from './pages/ApplyPage';
 import MyRegistrationsPage from './pages/MyRegistrationsPage';
 import AdminPage from './pages/AdminPage';
+import ContestsPage from './pages/ContestsPage';
+import AdminContestsPage from './pages/AdminContestsPage';
 
 export default function App() {
   return (
@@ -32,11 +34,21 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          {/* 比賽清單不設路由守衛：未登入的訪客也要看得到，這是招生素材 */}
+          <Route path="/contests" element={<ContestsPage />} />
           <Route
             path="/admin"
             element={
               <AdminRoute>
                 <AdminPage />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/admin/contests"
+            element={
+              <AdminRoute>
+                <AdminContestsPage />
               </AdminRoute>
             }
           />

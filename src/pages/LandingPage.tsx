@@ -1,7 +1,10 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Bot, Cpu, Trophy } from 'lucide-react';
 import LightningEffect from '../components/LightningEffect';
 import { useAuth } from '../auth/useAuth';
+import { listOpenContests } from '../lib/contests';
+import { formatGrade, type Contest } from '../lib/types';
 
 const FEATURES = [
   {
@@ -23,6 +26,19 @@ const FEATURES = [
 
 export default function LandingPage() {
   const { user, isAdmin } = useAuth();
+  const [contests, setContests] = useState<Contest[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    listOpenContests().then((rows) => {
+      if (!active) return;
+      // 進入頁只放最近三場，其餘引導到比賽頁
+      setContests(rows.filter((row) => row.status === 'published').slice(0, 3));
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-white">
@@ -99,6 +115,44 @@ export default function LandingPage() {
           ))}
         </div>
       </section>
+
+      {/*
+        近期比賽。未登入也讀得到（列級權限只擋草稿），這是招生素材 ——
+        家長不必先註冊才知道中心有在帶孩子比賽。沒有開放中的比賽時整段
+        不出現，免得留一塊空白區塊。
+      */}
+      {contests.length > 0 && (
+        <section className="bg-slate-50">
+          <div className="mx-auto max-w-6xl px-4 py-12 sm:py-16">
+            <h2 className="text-center text-2xl font-bold text-slate-900 sm:text-3xl">
+              近期比賽
+            </h2>
+            <ul className="mt-8 grid gap-4 sm:grid-cols-3">
+              {contests.map((contest) => (
+                <li key={contest.id} className="rounded-2xl bg-white p-5 shadow-sm">
+                  <h3 className="font-semibold text-slate-900">{contest.title}</h3>
+                  <p className="mt-2 text-sm text-slate-500">
+                    {contest.event_date} · {contest.location}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {formatGrade(contest.min_grade)}至
+                    {formatGrade(contest.max_grade)} · 報名至{' '}
+                    {contest.signup_deadline}
+                  </p>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-8 text-center">
+              <Link
+                to="/contests"
+                className="inline-block rounded-xl border border-brand-500 px-6 py-3 font-semibold text-brand-600 transition hover:bg-brand-50"
+              >
+                看比賽詳情與報名
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
 
       <section className="bg-brand-50">
         <div className="mx-auto max-w-3xl px-4 py-12 text-center sm:py-16">
