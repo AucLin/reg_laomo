@@ -271,3 +271,43 @@ const LEVEL_BY_GRADE_PREFIX: Record<string, SchoolLevel> = {
 export function levelFromGrade(grade: string): SchoolLevel {
   return LEVEL_BY_GRADE_PREFIX[grade[0]] ?? 'elementary';
 }
+
+/*
+  集訓。場次綁在比賽底下，一場一場排；出缺席沒有「還沒點名」這個狀態，
+  沒有列就是還沒點名 —— 少一種狀態就少一次同步的負擔，新錄取的孩子不必
+  回頭補建列。
+*/
+export interface TrainingSession {
+  id: string;
+  contest_id: string;
+  session_date: string;
+  start_time: string;
+  end_time: string;
+  location: string;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type AttendanceStatus = 'present' | 'absent' | 'excused';
+
+export const ATTENDANCE_LABELS: Record<AttendanceStatus, string> = {
+  present: '已到',
+  absent: '未到',
+  excused: '已請假',
+};
+
+export interface TrainingAttendance {
+  id: string;
+  session_id: string;
+  entry_id: string;
+  status: AttendanceStatus;
+  leave_reason: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** 時間欄位資料庫存的是 HH:MM:SS，畫面上只需要時分 */
+export function formatTime(time: string): string {
+  return time.slice(0, 5);
+}

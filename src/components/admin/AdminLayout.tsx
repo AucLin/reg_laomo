@@ -1,6 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { ClipboardList, ExternalLink, LogOut, Menu, Trophy, X } from 'lucide-react';
+import {
+  CalendarDays,
+  ClipboardList,
+  ExternalLink,
+  LogOut,
+  Menu,
+  Trophy,
+  X,
+} from 'lucide-react';
 import { useAuth } from '../../auth/useAuth';
 
 /*
@@ -17,6 +25,7 @@ import { useAuth } from '../../auth/useAuth';
 const NAV = [
   { to: '/admin', label: '報名管理', icon: ClipboardList, end: true },
   { to: '/admin/contests', label: '比賽管理', icon: Trophy, end: false },
+  { to: '/admin/training', label: '集訓管理', icon: CalendarDays, end: false },
 ];
 
 export default function AdminLayout() {

@@ -9,6 +9,7 @@ import StudentForm, {
   studentToFormValue,
   type StudentFormValue,
 } from '../components/StudentForm';
+import TrainingSchedule from '../components/TrainingSchedule';
 import {
   ClipboardDoodle,
   DashedRule,
@@ -455,6 +456,9 @@ export default function MyRegistrationsPage() {
             </ul>
           )}
         </section>
+
+        {/* 沒排集訓的家長不會看到這一區，元件自己會回 null */}
+        <TrainingSchedule />
       </div>
     </div>
   );
