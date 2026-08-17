@@ -13,7 +13,7 @@ export interface SchoolQuery {
 export async function searchSchools(query: SchoolQuery): Promise<School[]> {
   let request = supabase
     .from('schools')
-    .select('id, code, name, level, city, address, phone')
+    .select('id, code, name, level, city')
     .eq('level', query.level);
 
   if (query.cities.length > 0) {
@@ -60,7 +60,7 @@ export async function searchOtherLevels(query: SchoolQuery): Promise<School[]> {
 
   let request = supabase
     .from('schools')
-    .select('id, code, name, level, city, address, phone')
+    .select('id, code, name, level, city')
     .neq('level', query.level)
     .ilike('name', `%${keyword}%`);
 
@@ -88,7 +88,7 @@ export async function searchOtherLevels(query: SchoolQuery): Promise<School[]> {
 export async function getSchoolById(id: string): Promise<School | null> {
   const { data, error } = await supabase
     .from('schools')
-    .select('id, code, name, level, city, address, phone')
+    .select('id, code, name, level, city')
     .eq('id', id)
     .maybeSingle();
 

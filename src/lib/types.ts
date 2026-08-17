@@ -12,14 +12,17 @@ export interface Profile {
   created_at: string;
 }
 
+/*
+  沒有地址與電話。名錄裡那兩欄是教育部資料帶進來的，畫面上從來沒顯示過，
+  卻要跟著學校異動一起維護 —— 康橋青山校區在名錄裡就掛著秀岡的地址。
+  一份沒人看、也沒人會去更正的資料，留著只會有一天被誤當成正確的。
+*/
 export interface School {
   id: string;
   code: string;
   name: string;
   level: SchoolLevel;
   city: string;
-  address: string | null;
-  phone: string | null;
 }
 
 export interface Registration {

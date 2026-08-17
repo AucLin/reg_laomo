@@ -17,8 +17,6 @@ const sampleSchools = [
     name: '臺北市立中正國中',
     level: 'junior' as const,
     city: '臺北市',
-    address: null,
-    phone: null,
   },
   {
     id: 'school-2',
@@ -26,8 +24,6 @@ const sampleSchools = [
     name: '新北市立中正國中',
     level: 'junior' as const,
     city: '新北市',
-    address: null,
-    phone: null,
   },
 ];
 
@@ -321,8 +317,6 @@ describe('SchoolSelector', () => {
       name: '私立康橋高中',
       level: 'senior' as const,
       city: '新北市',
-      address: null,
-      phone: null,
     };
 
     it('這個級別查無結果時，告知同名學校登錄在哪個級別', async () => {
