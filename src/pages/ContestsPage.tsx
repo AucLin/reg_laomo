@@ -7,6 +7,7 @@ import Spinner, { PageLoading } from '../components/Spinner';
 import {
   cancelMyEntry,
   enterContest,
+  getContest,
   getTakenCounts,
   listMyEntries,
   listOpenContests,
@@ -45,7 +46,14 @@ export default function ContestsPage() {
   useEffect(() => {
     let active = true;
     async function load() {
-      const rows = await listOpenContests();
+      /*
+        帶了代碼就直接讀那一場、不篩狀態 —— 管理員藉此預覽還沒發佈的
+        草稿（列級權限只讓管理員讀得到草稿，家長會拿到 null 而看到
+        「找不到這場比賽」，跟發佈前的實際情況一致）。
+      */
+      const rows = contestId
+        ? [await getContest(contestId)].filter((item) => item !== null)
+        : await listOpenContests();
       const counts = await getTakenCounts(rows.map((item) => item.id));
       if (!active) return;
       setContests(rows);
@@ -56,7 +64,7 @@ export default function ContestsPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [contestId]);
 
   useEffect(() => {
     if (!user) return;
@@ -131,6 +139,14 @@ export default function ContestsPage() {
           </Link>
         )}
 
+        {/* 草稿只有管理員讀得到，會走到這裡的就是在預覽 */}
+        {shown.some((item) => item.status === 'draft') && (
+          <p className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            預覽中：這場比賽還是草稿，家長打開這個連結會看到「找不到這場比賽」。
+            要開放報名請回後台按發佈。
+          </p>
+        )}
+
         {shown.length === 0 ? (
           <p className="mt-6 rounded-2xl bg-white p-8 text-center text-slate-500 shadow-sm">
             {/* 分享連結指到草稿或已刪除的比賽時，家長會落到這裡 */}
@@ -158,7 +174,11 @@ export default function ContestsPage() {
                     <h2 className="text-lg font-semibold text-slate-900">
                       {contest.title}
                     </h2>
-                    {contest.status === 'closed' ? (
+                    {contest.status === 'draft' ? (
+                      <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800">
+                        草稿
+                      </span>
+                    ) : contest.status === 'closed' ? (
                       <span className="rounded-full bg-slate-200 px-2.5 py-1 text-xs font-medium text-slate-600">
                         已關閉
                       </span>

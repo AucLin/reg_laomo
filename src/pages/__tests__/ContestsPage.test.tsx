@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import ContestsPage from '../ContestsPage';
 import * as contestsModule from '../../lib/contests';
@@ -55,6 +55,17 @@ function renderPage() {
   );
 }
 
+/** 分享連結與預覽走的是帶代碼的路由 */
+function renderSingle(id: string) {
+  return render(
+    <MemoryRouter initialEntries={[`/contests/${id}`]}>
+      <Routes>
+        <Route path="/contests/:contestId" element={<ContestsPage />} />
+      </Routes>
+    </MemoryRouter>
+  );
+}
+
 describe('ContestsPage', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -100,6 +111,37 @@ describe('ContestsPage', () => {
     expect(await screen.findByRole('button', { name: '報名' })).toBeInTheDocument();
     // 國小二年級不在範圍內
     expect(screen.getByText('年級不符')).toBeInTheDocument();
+  });
+
+  /*
+    預覽草稿走的是家長看到的同一頁：管理員讀得到草稿（列級權限給的），
+    家長讀不到會拿到 null。所以帶代碼的路由不能篩狀態，要直接讀那一場。
+  */
+  it('帶代碼進來時直接讀那一場，草稿也讀得到（管理員預覽）', async () => {
+    vi.spyOn(contestsModule, 'getContest').mockResolvedValue(
+      makeContest({ status: 'draft' })
+    );
+    vi.spyOn(contestsModule, 'getTakenCounts').mockResolvedValue(new Map());
+    const listSpy = vi.spyOn(contestsModule, 'listOpenContests');
+
+    renderSingle('contest-1');
+
+    expect(await screen.findByText('全國機器人大賽')).toBeInTheDocument();
+    expect(screen.getByText('草稿')).toBeInTheDocument();
+    expect(screen.getByText(/家長打開這個連結會看到/)).toBeInTheDocument();
+    // 篩狀態的那條路會把草稿濾掉，預覽就看不到了
+    expect(listSpy).not.toHaveBeenCalled();
+  });
+
+  it('連結指到讀不到的比賽時說找不到，不是顯示空白', async () => {
+    vi.spyOn(contestsModule, 'getContest').mockResolvedValue(null);
+    vi.spyOn(contestsModule, 'getTakenCounts').mockResolvedValue(new Map());
+
+    renderSingle('contest-missing');
+
+    expect(
+      await screen.findByText('找不到這場比賽，可能尚未開放或已經結束')
+    ).toBeInTheDocument();
   });
 
   it('額滿的比賽不給報名', async () => {

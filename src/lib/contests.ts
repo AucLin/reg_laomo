@@ -57,6 +57,27 @@ export async function listOpenContests(): Promise<Contest[]> {
   return (data ?? []) as Contest[];
 }
 
+/**
+ * 讀單一場比賽，不篩狀態。
+ *
+ * 分享連結與預覽都走這裡：管理員讀得到草稿（列級權限給的），家長讀不到，
+ * 拿到 null 就會看到「找不到這場比賽」。同一支函式同時撐起兩種情境，
+ * 不必為預覽另外開一條路。
+ */
+export async function getContest(id: string): Promise<Contest | null> {
+  const { data, error } = await supabase
+    .from('contests')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (error) {
+    console.error('讀取比賽失敗：', error.message);
+    return null;
+  }
+  return data as Contest | null;
+}
+
 /** 後台用：草稿也要看得到。列級權限只讓管理員讀到草稿 */
 export async function listAllContests(): Promise<Contest[]> {
   const { data, error } = await supabase

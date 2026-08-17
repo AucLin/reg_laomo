@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { Check, Copy, Download, Share2 } from 'lucide-react';
+import { Check, Copy, Download, Eye, Share2 } from 'lucide-react';
 import AppHeader from '../components/AppHeader';
 import StatusBadge from '../components/StatusBadge';
 import Spinner, { PageLoading } from '../components/Spinner';
@@ -736,6 +736,21 @@ export default function AdminContestsPage() {
                     >
                       編輯
                     </button>
+                    {/*
+                      預覽開新分頁，不要把後台的位置弄丟 —— 看完關掉分頁
+                      就回到原本捲動到的地方。走的是家長看到的同一頁，
+                      草稿也讀得到（列級權限只給管理員），所以看到的
+                      版面跟發佈後一模一樣。
+                    */}
+                    <a
+                      href={`/contests/${contest.id}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50"
+                    >
+                      <Eye className="h-4 w-4" />
+                      預覽
+                    </a>
                     <button
                       type="button"
                       onClick={() => {
