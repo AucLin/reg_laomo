@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getGradeOptions, DEFAULT_CITIES, STATUS_LABELS } from '../types';
+import { gradeRank, getGradeOptions, DEFAULT_CITIES, STATUS_LABELS } from '../types';
 
 describe('getGradeOptions', () => {
   it('國小回傳六個年級', () => {
@@ -43,5 +43,48 @@ describe('STATUS_LABELS', () => {
     expect(STATUS_LABELS.contacted).toBe('已聯絡');
     expect(STATUS_LABELS.enrolled).toBe('已錄取');
     expect(STATUS_LABELS.cancelled).toBe('已取消');
+  });
+});
+
+/*
+  比賽的參賽年級是一個區間（例如「國小四年級到六年級」），但 E/J/S 的
+  年級代碼本身沒有順序。直接比字串會得出 'E4' < 'J1' 這種碰巧正確的
+  假象，換個字首就崩了，所以要有明確的排序值。
+*/
+describe('gradeRank', () => {
+  it('國小一到六年級對應 1 到 6', () => {
+    expect(gradeRank('E1')).toBe(1);
+    expect(gradeRank('E6')).toBe(6);
+  });
+
+  it('國中一到三年級接在國小後面，對應 7 到 9', () => {
+    expect(gradeRank('J1')).toBe(7);
+    expect(gradeRank('J3')).toBe(9);
+  });
+
+  it('高中職一到三年級對應 10 到 12', () => {
+    expect(gradeRank('S1')).toBe(10);
+    expect(gradeRank('S3')).toBe(12);
+  });
+
+  it('跨級別的大小關係正確', () => {
+    // 這正是字串比對做不到的事
+    expect(gradeRank('E6')!).toBeLessThan(gradeRank('J1')!);
+    expect(gradeRank('J3')!).toBeLessThan(gradeRank('S1')!);
+  });
+
+  it.each([
+    ['', '空字串'],
+    ['E0', '國小沒有零年級'],
+    ['E7', '國小只到六年級'],
+    ['J4', '國中只到三年級'],
+    ['S4', '高中職只到三年級'],
+    ['X1', '沒有這個級別'],
+    ['e1', '小寫不接受'],
+    ['E 1', '中間有空白'],
+    ['E10', '兩位數'],
+    ['1', '只有數字'],
+  ])('無法識別的代碼 %s（%s）回傳 null', (input) => {
+    expect(gradeRank(input)).toBeNull();
   });
 });

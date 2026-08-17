@@ -68,6 +68,35 @@ export interface RegistrationWithSchool extends Registration {
 }
 
 /**
+ * 孩子。這張表存的是「現在」的狀況 —— 年級每年會變、學校會轉。
+ * 報名紀錄上的年級與學校是各自的快照，不要拿這裡的值去顯示歷史報名。
+ */
+export interface Student {
+  id: string;
+  parent_id: string;
+  name: string;
+  gender: Gender;
+  birthday: string;
+  school_id: string | null;
+  school_name_raw: string | null;
+  grade: string;
+  class_name: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * 孩子附帶學校名稱，對應 students_with_school 檢視表。
+ * 學校欄位是左連接來的，「找不到我的學校」那類孩子這三欄會是 null，
+ * 顯示時要退回 school_name_raw。
+ */
+export interface StudentWithSchool extends Student {
+  school_name: string | null;
+  school_city: string | null;
+  school_level: SchoolLevel | null;
+}
+
+/**
  * 管理員後台專用的延伸型別：合併過內部備註的報名列。只有
  * adminRegistrations.ts 的 listRegistrations／listAllForExport 會產出
  * 這個型別，家長端一律用 RegistrationWithSchool（不含 admin_note）。
@@ -141,4 +170,36 @@ export function formatGrade(grade: string): string {
     return grade;
   }
   return `${level}${CHINESE_NUMERALS[index]}年級`;
+}
+
+const GRADE_RANK_CONFIG: Record<string, { offset: number; max: number }> = {
+  E: { offset: 0, max: 6 },
+  J: { offset: 6, max: 3 },
+  S: { offset: 9, max: 3 },
+};
+
+/**
+ * 年級代碼轉排序值：E1–E6 → 1–6、J1–J3 → 7–9、S1–S3 → 10–12。
+ *
+ * 比賽的參賽年級是一個區間，而年級代碼本身沒有順序 —— 直接比字串會得出
+ * 'E4' < 'J1' 這種碰巧正確的結果，換個字首就崩了。
+ *
+ * 這份實作必須與資料庫的 grade_rank() 完全一致（見
+ * supabase/migrations/20260818100000_create_students.sql）。資料庫那份是
+ * 權威，這份只是為了讓前端不必等一次往返就能標出不符年級的孩子。
+ *
+ * 無法識別的代碼回 null 而不是丟例外：呼叫端拿到的是舊資料時，
+ * 應該把那個孩子標成不可選，而不是讓整個畫面掛掉。
+ */
+export function gradeRank(grade: string): number | null {
+  // 用正規表示式而不是 Number() 判斷：Number(' 1') 是 1，
+  // 會讓 'E 1' 這種帶空白的代碼矇混過關
+  const matched = /^([EJS])([1-9])$/.exec(grade);
+  if (!matched) return null;
+
+  const config = GRADE_RANK_CONFIG[matched[1]];
+  const value = Number(matched[2]);
+  if (value > config.max) return null;
+
+  return config.offset + value;
 }
