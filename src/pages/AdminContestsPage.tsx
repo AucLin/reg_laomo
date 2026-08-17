@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { Copy, Download, Share2 } from 'lucide-react';
+import { Check, Copy, Download, Share2 } from 'lucide-react';
 import AppHeader from '../components/AppHeader';
 import StatusBadge from '../components/StatusBadge';
 import Spinner, { PageLoading } from '../components/Spinner';
@@ -151,6 +151,8 @@ export default function AdminContestsPage() {
     const ok = await copyToClipboard(text);
     // 複製失敗要說出來。靜靜地什麼都沒發生，管理員會以為複製好了
     setCopyNote(ok ? `已複製${label}` : '複製失敗，請手動選取後複製');
+    // 提示留一下就收掉，不然一直掛在那裡會讓人以為是狀態而不是剛才的動作
+    window.setTimeout(() => setCopyNote(''), 3000);
   }
 
   async function reload() {
@@ -955,6 +957,18 @@ function SharePanel({
         </button>
       </div>
 
+      {/* 複製完成的提示要貼著按鈕。擺到最下面的話，畫面一長就看不到，
+          會讓人以為沒複製到而重複按 */}
+      {copyNote && (
+        <p
+          role="status"
+          className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700"
+        >
+          <Check className="h-4 w-4" aria-hidden="true" />
+          {copyNote}
+        </p>
+      )}
+
       {/* 臉書只吃網址，帶不了自訂文字，所以文案要自己貼 */}
       <p className="mt-2 text-xs text-slate-400">
         臉書只會帶網址，貼文內容請用「複製整段文案」自己貼上。
@@ -963,12 +977,6 @@ function SharePanel({
       <pre className="mt-3 whitespace-pre-wrap rounded-lg bg-white p-3 text-xs text-slate-600">
         {text}
       </pre>
-
-      {copyNote && (
-        <p role="status" className="mt-2 text-sm text-brand-600">
-          {copyNote}
-        </p>
-      )}
     </div>
   );
 }
