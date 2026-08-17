@@ -1,34 +1,15 @@
 import { z } from 'zod';
 import { isValidTaiwanPhone } from './phone';
+import { GRADE_PREFIX, MAX_AGE, MIN_AGE, isValidStudentBirthday } from './student';
 
-const MIN_AGE = 5;
-const MAX_AGE = 20;
-
-/**
- * 驗證學生生日是否落在合理的就學年齡範圍。
- * today 由呼叫端傳入而非在函式內取當下時間，測試才能給定固定日期，
- * 不會隨著時間經過自己失效。
- */
-export function isValidStudentBirthday(birthday: string, today: Date): boolean {
-  const date = new Date(birthday);
-  if (Number.isNaN(date.getTime())) return false;
-  if (date > today) return false;
-
-  const earliest = new Date(today);
-  earliest.setFullYear(earliest.getFullYear() - MAX_AGE);
-
-  const latest = new Date(today);
-  latest.setFullYear(latest.getFullYear() - MIN_AGE);
-
-  return date >= earliest && date <= latest;
-}
-
-/** 年級代碼的字首必須對應學校級別，避免出現「國小七年級」這種組合 */
-const GRADE_PREFIX: Record<string, string> = {
-  elementary: 'E',
-  junior: 'J',
-  senior: 'S',
-};
+/*
+  MIN_AGE、MAX_AGE、isValidStudentBirthday、GRADE_PREFIX 的權威定義在
+  student.ts —— 報名表與「我的孩子」管理區驗證的是同一組學生欄位，
+  兩邊都改同一份常數與函式才不會各自漂移。這裡重新匯出
+  isValidStudentBirthday 是因為既有的 registration.test.ts 是從這個
+  檔案匯入它，不能因為搬家而讓既有測試壞掉。
+*/
+export { isValidStudentBirthday };
 
 export const registrationSchema = z
   .object({

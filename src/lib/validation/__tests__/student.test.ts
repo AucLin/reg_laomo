@@ -69,4 +69,44 @@ describe('studentSchema', () => {
   it('班級可以留空', () => {
     expect(studentSchema.safeParse({ ...valid, class_name: '' }).success).toBe(true);
   });
+
+  it('生日太早（超過就學年齡上限）不通過', () => {
+    // 1990-01-01 無論今天是哪一天都必然超過 MAX_AGE，不用怕測試隨日期飄移
+    const result = studentSchema.safeParse({ ...valid, birthday: '1990-01-01' });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].message).toBe(
+        '生日不合理，就讀學生年齡應介於 5 至 20 歲'
+      );
+    }
+  });
+
+  it('生日在未來不通過', () => {
+    const result = studentSchema.safeParse({ ...valid, birthday: '2099-01-01' });
+    expect(result.success).toBe(false);
+  });
+
+  it('合理生日通過（沿用預設樣本，本來就在就學年齡範圍內）', () => {
+    expect(studentSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it('學校名稱超過 50 個字不通過', () => {
+    const result = studentSchema.safeParse({
+      ...valid,
+      school_id: '',
+      school_name_raw: '某'.repeat(51),
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].message).toBe('學校名稱最多 50 個字');
+    }
+  });
+
+  it('班級名稱超過 20 個字不通過', () => {
+    const result = studentSchema.safeParse({ ...valid, class_name: '班'.repeat(21) });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].message).toBe('班級最多 20 個字');
+    }
+  });
 });
