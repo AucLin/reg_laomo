@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Search, X } from 'lucide-react';
 import {
   SCHOOL_LEVEL_LABELS,
@@ -19,9 +20,27 @@ export default function RegistrationFilters({ value, onChange }: Props) {
     onChange({ ...value, ...patch });
   }
 
-  // 搜尋框比對學生姓名、家長姓名，用注音／倉頡輸入時要擋組字期間的半成品，
-  // 不然行政人員選字選到一半就會被送出一次殘缺的 ilike 查詢
-  const keywordIme = useImeGuardedInput((keyword) => update({ keyword }));
+  /*
+    搜尋框的顯示與查詢要分開處理。
+
+    顯示：draft 一律跟著使用者打的字走，包含還沒選字的注音。少了這個
+    本地狀態，輸入框的值只能來自父層，而組字期間父層還沒更新，重新
+    渲染就會把注音清掉 —— 行政人員會發現中文根本打不進搜尋框。
+
+    查詢：組字期間不推給父層，不然選字選到一半就會送出一次
+    「ㄌㄧㄣˊ」的 ilike 查詢，查不到東西還讓清單在打字過程中亂跳。
+  */
+  const [draft, setDraft] = useState(value.keyword);
+
+  // 父層若從外部改動關鍵字（例如按下「清除篩選」），本地顯示要跟著回正
+  useEffect(() => {
+    setDraft(value.keyword);
+  }, [value.keyword]);
+
+  const keywordIme = useImeGuardedInput((keyword, { composing }) => {
+    setDraft(keyword);
+    if (!composing) update({ keyword });
+  });
 
   const gradeOptions =
     value.level === '' ? [] : getGradeOptions(value.level as SchoolLevel);
@@ -104,7 +123,7 @@ export default function RegistrationFilters({ value, onChange }: Props) {
             <input
               id="filter-keyword"
               type="text"
-              value={value.keyword}
+              value={draft}
               onChange={keywordIme.onChange}
               onCompositionStart={keywordIme.onCompositionStart}
               onCompositionEnd={keywordIme.onCompositionEnd}

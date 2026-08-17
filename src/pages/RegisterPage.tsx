@@ -1,8 +1,9 @@
-import { useRef, useState, type CompositionEvent, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { isValidTaiwanPhone } from '../lib/validation/phone';
 import EmailField from '../components/EmailField';
+import { useImeGuardedInput } from '../lib/hooks/useImeGuardedInput';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -20,26 +21,9 @@ export default function RegisterPage() {
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
   const [confirmationEmail, setConfirmationEmail] = useState('');
 
-  // 姓名欄位用注音、倉頡等輸入法組字時，瀏覽器會在選字完成前不斷觸發
-  // onChange（值是「ㄓㄨㄥ」這種半成品）。組字期間先不更新狀態，
-  // 避免半成品被拿去做任何判斷；等 compositionend 才寫入最終值。
-  const isComposingRef = useRef(false);
-
-  function handleFullNameChange(value: string) {
-    if (isComposingRef.current) return;
-    setFullName(value);
-  }
-
-  function handleFullNameCompositionStart() {
-    isComposingRef.current = true;
-  }
-
-  function handleFullNameCompositionEnd(event: CompositionEvent<HTMLInputElement>) {
-    isComposingRef.current = false;
-    // 部分瀏覽器的 compositionend 在 change 之後才觸發，這裡補寫一次
-    // 最終值，否則組字完成的最後一個字會漏掉。
-    setFullName(event.currentTarget.value);
-  }
+  // 姓名欄位要能用注音、倉頡輸入中文。細節（組字途中的注音也必須寫進
+  // 狀態，否則重新渲染會把它清掉）統一由共用的守衛處理。
+  const fullNameIme = useImeGuardedInput(setFullName);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -140,9 +124,9 @@ export default function RegisterPage() {
               type="text"
               value={fullName}
               autoComplete="name"
-              onChange={(event) => handleFullNameChange(event.target.value)}
-              onCompositionStart={handleFullNameCompositionStart}
-              onCompositionEnd={handleFullNameCompositionEnd}
+              onChange={fullNameIme.onChange}
+              onCompositionStart={fullNameIme.onCompositionStart}
+              onCompositionEnd={fullNameIme.onCompositionEnd}
               className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
             />
           </div>

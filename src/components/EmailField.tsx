@@ -1,5 +1,6 @@
-import { useId, useRef, useState, type CompositionEvent, type KeyboardEvent } from 'react';
+import { useId, useState, type KeyboardEvent } from 'react';
 import { suggestEmails } from '../lib/emailDomains';
+import { useImeGuardedInput } from '../lib/hooks/useImeGuardedInput';
 
 interface Props {
   value: string;
@@ -23,33 +24,29 @@ export default function EmailField({ value, onChange }: Props) {
   /*
     中文輸入法組字狀態。使用者若停在注音模式打字，輸入框會短暫變成
     「ㄇㄚ」這種半成品，這時算出來的建議是一串沒有意義的注音符號。
-    組字期間一律不更新，等 compositionend 拿到最終文字再處理。
-  */
-  const isComposingRef = useRef(false);
 
-  const suggestions = isComposingRef.current ? [] : suggestEmails(value);
+    這裡用狀態而不是 ref：ref 改變不會觸發重新渲染，拿它決定要不要
+    顯示建議，畫面會慢一拍。值本身則一律即時寫入 —— 組字途中的注音
+    若沒進到狀態，重新渲染就會把它清掉，中文根本打不進去。
+  */
+  const [composing, setComposing] = useState(false);
+
+  const ime = useImeGuardedInput((next, meta) => {
+    onChange(next);
+    setComposing(meta.composing);
+    if (meta.composing) return;
+    setOpen(true);
+    // 清單內容一變，先前停留的位置就沒有意義了
+    setActiveIndex(-1);
+  });
+
+  const suggestions = composing ? [] : suggestEmails(value);
   const visible = open && suggestions.length > 0;
 
   function commit(email: string) {
     onChange(email);
     setOpen(false);
     setActiveIndex(-1);
-  }
-
-  function handleChange(next: string) {
-    onChange(next);
-    if (isComposingRef.current) return;
-    setOpen(true);
-    // 清單內容一變，先前停留的位置就沒有意義了
-    setActiveIndex(-1);
-  }
-
-  function handleCompositionEnd(event: CompositionEvent<HTMLInputElement>) {
-    isComposingRef.current = false;
-    // 部分瀏覽器的 compositionend 在 change 之後才觸發，這裡補寫一次
-    // 最終值，否則選字完成的最後一個字會漏掉。
-    onChange(event.currentTarget.value);
-    setOpen(true);
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
@@ -105,11 +102,12 @@ export default function EmailField({ value, onChange }: Props) {
           aria-activedescendant={
             activeIndex >= 0 ? `${listboxId}-${activeIndex}` : undefined
           }
-          onChange={(event) => handleChange(event.target.value)}
+          onChange={ime.onChange}
           onCompositionStart={() => {
-            isComposingRef.current = true;
+            setComposing(true);
+            ime.onCompositionStart();
           }}
-          onCompositionEnd={handleCompositionEnd}
+          onCompositionEnd={ime.onCompositionEnd}
           onKeyDown={handleKeyDown}
           onFocus={() => setOpen(true)}
           onBlur={() => {

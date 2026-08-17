@@ -98,7 +98,7 @@ describe('RegisterPage', () => {
     });
   });
 
-  it('用注音輸入中文姓名時，組字中不寫入半成品，選字完成後才寫入', async () => {
+  it('用注音輸入中文姓名時，組字途中的注音要留在畫面上', async () => {
     renderPage();
 
     const nameInput = screen.getByLabelText('家長姓名') as HTMLInputElement;
@@ -107,15 +107,14 @@ describe('RegisterPage', () => {
     fireEvent.compositionStart(nameInput);
     fireEvent.change(nameInput, { target: { value: 'ㄨㄤˊ' } });
 
-    // 組字中的半成品不該寫進 React 狀態：讓另一個欄位觸發重新渲染，
-    // 若姓名狀態真的沒被半成品覆蓋，受控欄位會被打回原本的空值。
+    // 讓另一個欄位觸發一次重新渲染。組字中的注音若沒進到狀態，
+    // 這一刻就會被打回空字串，家長的中文姓名根本打不進去。
     fireEvent.change(phoneInput, { target: { value: '0' } });
-    expect(nameInput.value).toBe('');
+    expect(nameInput.value).toBe('ㄨㄤˊ');
 
     fireEvent.compositionEnd(nameInput, { target: { value: '王小明' } });
 
-    // 選字完成後應該已經寫進狀態：再讓別的欄位觸發一次重新渲染，
-    // 姓名欄位仍要維持最終值，而不是被打回空字串。
+    // 選字完成後再讓別的欄位觸發一次重新渲染，姓名要維持最終值。
     fireEvent.change(phoneInput, { target: { value: '09' } });
     expect(nameInput.value).toBe('王小明');
 

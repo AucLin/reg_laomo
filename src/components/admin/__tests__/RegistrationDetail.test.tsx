@@ -96,7 +96,7 @@ describe('RegistrationDetail', () => {
   // RegistrationDetail.tsx 範例程式碼本身沒有套用 IME 守衛，屬於範例程式碼
   // 漏掉這段防護，不是「應該照抄」的正確版本，比照 RegistrationTable 的
   // filter-keyword 先例（task-16 已補過同類缺口）處理。
-  it('備註使用中文輸入法時，組字中不寫入半成品', () => {
+  it('備註使用中文輸入法時，組字途中的注音要留在畫面上', () => {
     render(
       <RegistrationDetail
         registration={registration}
@@ -111,10 +111,10 @@ describe('RegistrationDetail', () => {
     fireEvent.compositionStart(noteInput);
     fireEvent.change(noteInput, { target: { value: 'ㄌㄧㄣˊ' } });
 
-    // 組字中的半成品不該寫進 React 狀態：讓狀態下拉選單觸發重新渲染，
-    // 若備註狀態真的沒被半成品覆蓋，受控欄位會被打回原本的空值。
+    // 讓狀態下拉選單觸發一次重新渲染。組字中的注音若沒進到狀態，
+    // 這一刻就會被打回空字串，行政人員的中文備註根本打不進去。
     fireEvent.change(statusSelect, { target: { value: 'contacted' } });
-    expect(noteInput.value).toBe('');
+    expect(noteInput.value).toBe('ㄌㄧㄣˊ');
   });
 
   it('備註組字結束後補寫最終選字結果', () => {

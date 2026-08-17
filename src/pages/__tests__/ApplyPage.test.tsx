@@ -239,7 +239,7 @@ describe('ApplyPage', () => {
     expect(screen.getByRole('button', { name: '儲存修改' })).toBeDisabled();
   });
 
-  it('用注音輸入學生姓名時，組字中不寫入半成品，選字完成後才寫入', async () => {
+  it('用注音輸入學生姓名時，組字途中的注音要留在畫面上', async () => {
     renderPage();
 
     const nameInput = screen.getByLabelText('學生姓名') as HTMLInputElement;
@@ -248,15 +248,14 @@ describe('ApplyPage', () => {
     fireEvent.compositionStart(nameInput);
     fireEvent.change(nameInput, { target: { value: 'ㄌㄧㄣˊ' } });
 
-    // 組字中的半成品不該寫進 React 狀態：讓另一個欄位觸發重新渲染，
-    // 若姓名狀態真的沒被半成品覆蓋，受控欄位會被打回原本的空值。
+    // 真實表單一定有其他欄位，任何一個變動都會讓整張表重新渲染。
+    // 組字中的注音若沒進到狀態，這一刻就會被打回空字串 —— 家長的
+    // 體感是「打了字，畫面上什麼都沒出現」，中文完全打不進去。
     fireEvent.change(birthdayInput, { target: { value: '2016-05-20' } });
-    expect(nameInput.value).toBe('');
+    expect(nameInput.value).toBe('ㄌㄧㄣˊ');
 
     fireEvent.compositionEnd(nameInput, { target: { value: '林小明' } });
 
-    // 選字完成後應該已經寫進狀態：再讓別的欄位觸發一次重新渲染，
-    // 姓名欄位仍要維持最終值，而不是被打回空字串。
     fireEvent.change(birthdayInput, { target: { value: '2016-05-20' } });
     expect(nameInput.value).toBe('林小明');
   });
