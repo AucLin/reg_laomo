@@ -25,6 +25,13 @@ export interface School {
 export interface Registration {
   id: string;
   parent_id: string;
+  /*
+    這筆報名屬於哪個孩子。學生欄位（姓名、年級、學校…）仍然逐欄保留，
+    那是「報名送出當下」的快照 —— 孩子升年級或轉學之後，舊報名要維持
+    原樣才對得起當時的審核紀錄。student_id 只用來把報名歸到孩子名下。
+    舊資料回填前可能是 null，型別要留住這個可能。
+  */
+  student_id: string | null;
   student_name: string;
   student_gender: Gender;
   student_birthday: string;
@@ -202,4 +209,22 @@ export function gradeRank(grade: string): number | null {
   if (value > config.max) return null;
 
   return config.offset + value;
+}
+
+const LEVEL_BY_GRADE_PREFIX: Record<string, SchoolLevel> = {
+  E: 'elementary',
+  J: 'junior',
+  S: 'senior',
+};
+
+/**
+ * 從年級代碼反推學校級別。
+ *
+ * 選既有孩子來報名時不能拿 school_level 當級別：那是左連接學校名錄來的，
+ * 自由填寫校名的孩子會是 null，退回預設值就可能把國中生標成國小，
+ * 讓「年級與學校級別不符」的檢查誤擋。年級代碼的字首才是可靠來源，
+ * 資料庫的 students_grade_valid 檢查限制式保證它一定是 E／J／S 開頭。
+ */
+export function levelFromGrade(grade: string): SchoolLevel {
+  return LEVEL_BY_GRADE_PREFIX[grade[0]] ?? 'elementary';
 }

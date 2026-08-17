@@ -2,15 +2,38 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import AppHeader from '../components/AppHeader';
-import SchoolSelector, { type SchoolSelection } from '../components/SchoolSelector';
+import StudentForm, {
+  EMPTY_STUDENT_FORM,
+  parseStudentForm,
+  studentToFormValue,
+  type StudentFormValue,
+} from '../components/StudentForm';
 import { useImeGuardedInput } from '../lib/hooks/useImeGuardedInput';
 import {
   createRegistration,
   getRegistration,
   updateRegistration,
 } from '../lib/registrations';
+import { createStudent, listMyStudents } from '../lib/students';
 import { registrationSchema } from '../lib/validation/registration';
-import { getGradeOptions, RELATION_LABELS, type Relation } from '../lib/types';
+import {
+  formatGrade,
+  levelFromGrade,
+  RELATION_LABELS,
+  type Relation,
+  type StudentWithSchool,
+} from '../lib/types';
+
+/** 一筆報名要記下來的學生資料，也就是送出當下的快照 */
+interface StudentSnapshot {
+  name: string;
+  gender: 'male' | 'female';
+  birthday: string;
+  school_id: string | null;
+  school_name_raw: string | null;
+  grade: string;
+  class_name: string | null;
+}
 
 export default function ApplyPage() {
   const navigate = useNavigate();
@@ -21,16 +44,12 @@ export default function ApplyPage() {
   const editId = searchParams.get('edit');
   const isEditing = editId !== null;
 
-  const [studentName, setStudentName] = useState('');
-  const [gender, setGender] = useState<'male' | 'female' | ''>('');
-  const [birthday, setBirthday] = useState('');
-  const [school, setSchool] = useState<SchoolSelection>({
-    level: 'elementary',
-    schoolId: '',
-    schoolNameRaw: '',
-  });
-  const [grade, setGrade] = useState('');
-  const [className, setClassName] = useState('');
+  const [students, setStudents] = useState<StudentWithSchool[]>([]);
+  const [selectedStudentId, setSelectedStudentId] = useState('');
+  const [addingNew, setAddingNew] = useState(false);
+  const [studentDraft, setStudentDraft] =
+    useState<StudentFormValue>(EMPTY_STUDENT_FORM);
+
   const [parentName, setParentName] = useState(profile?.full_name ?? '');
   const [relation, setRelation] = useState<Relation | ''>('');
   const [phone, setPhone] = useState(profile?.phone ?? '');
@@ -41,9 +60,27 @@ export default function ApplyPage() {
   // 「標題顯示修改、欄位卻全部空白」這種看不出原因的狀態。
   const [editError, setEditError] = useState('');
 
-  const studentNameIme = useImeGuardedInput(setStudentName);
-  const classNameIme = useImeGuardedInput(setClassName);
   const parentNameIme = useImeGuardedInput(setParentName);
+
+  /*
+    一個孩子都還沒建、或家長主動要新增，就直接展開表單；否則給清單挑。
+    修改既有報名時也走表單 —— 那一筆的學生欄位是當初的快照，要能就地改。
+  */
+  const showStudentForm = isEditing || addingNew || students.length === 0;
+
+  useEffect(() => {
+    if (isEditing) return;
+    let active = true;
+    listMyStudents().then((rows) => {
+      if (!active) return;
+      setStudents(rows);
+      // 只有一個孩子就先幫他選好，最常見的情況少點一下
+      if (rows.length === 1) setSelectedStudentId(rows[0].id);
+    });
+    return () => {
+      active = false;
+    };
+  }, [isEditing]);
 
   // 編輯模式：把既有內容載進表單
   useEffect(() => {
@@ -57,18 +94,18 @@ export default function ApplyPage() {
         setEditError('找不到這筆報名，可能已被刪除或不屬於您');
         return;
       }
-      setStudentName(existing.student_name);
-      setGender(existing.student_gender);
-      setBirthday(existing.student_birthday);
-      setSchool({
+      setStudentDraft({
+        name: existing.student_name,
+        gender: existing.student_gender,
+        birthday: existing.student_birthday,
         // school_level 是左連接來的，自由文字校名的報名會是 null，
         // 這時退回國小當預設，家長可以自己改
         level: existing.school_level ?? 'elementary',
         schoolId: existing.school_id ?? '',
         schoolNameRaw: existing.school_name_raw ?? '',
+        grade: existing.grade,
+        className: existing.class_name ?? '',
       });
-      setGrade(existing.grade);
-      setClassName(existing.class_name ?? '');
       setParentName(existing.parent_name);
       setRelation(existing.relation);
       setPhone(existing.contact_phone);
@@ -78,25 +115,60 @@ export default function ApplyPage() {
     };
   }, [editId]);
 
-  function handleSchoolChange(next: SchoolSelection) {
-    // 級別換了，原本選的年級一定不再適用，清掉逼使用者重選
-    if (next.level !== school.level) setGrade('');
-    setSchool(next);
+  function startAddNew() {
+    setAddingNew(true);
+    setStudentDraft(EMPTY_STUDENT_FORM);
+    setError('');
   }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setError('');
 
+    if (!user) {
+      setError('登入狀態已失效，請重新登入');
+      return;
+    }
+
+    // 先決定這筆報名記在哪個孩子名下，以及要寫進報名的學生快照
+    let studentId = selectedStudentId;
+    let snapshot: StudentSnapshot;
+
+    if (showStudentForm) {
+      const parsed = parseStudentForm(studentDraft);
+      if (!parsed.ok) {
+        setError(parsed.message);
+        return;
+      }
+      snapshot = parsed.data;
+    } else {
+      const picked = students.find((item) => item.id === selectedStudentId);
+      if (!picked) {
+        setError('請選擇一個孩子');
+        return;
+      }
+      snapshot = {
+        name: picked.name,
+        gender: picked.gender,
+        birthday: picked.birthday,
+        school_id: picked.school_id,
+        school_name_raw: picked.school_name_raw,
+        grade: picked.grade,
+        class_name: picked.class_name,
+      };
+    }
+
     const parsed = registrationSchema.safeParse({
-      student_name: studentName,
-      student_gender: gender,
-      student_birthday: birthday,
-      school_level: school.level,
-      school_id: school.schoolId,
-      school_name_raw: school.schoolNameRaw,
-      grade,
-      class_name: className,
+      student_name: snapshot.name,
+      student_gender: snapshot.gender,
+      student_birthday: snapshot.birthday,
+      // 級別由年級代碼反推，不用孩子的 school_level —— 後者是左連接來的，
+      // 自由填寫校名的孩子會是 null
+      school_level: levelFromGrade(snapshot.grade),
+      school_id: snapshot.school_id ?? '',
+      school_name_raw: snapshot.school_name_raw ?? '',
+      grade: snapshot.grade,
+      class_name: snapshot.class_name ?? '',
       parent_name: parentName,
       relation,
       contact_phone: phone,
@@ -107,32 +179,51 @@ export default function ApplyPage() {
       return;
     }
 
-    if (!user) {
-      setError('登入狀態已失效，請重新登入');
-      return;
-    }
-
-    // 資料庫用 IS NOT NULL 判斷「有沒有選學校 / 有沒有填班級」，
-    // 若把 Zod 驗證通過的空字串原樣寫進去，'' IS NOT NULL 永遠成立，
-    // school_required 這條檢查限制式就形同虛設。可空欄位一律把空字串轉成 null 再送出。
+    // 可空欄位一律把空字串轉成 null 再送出：資料庫用 IS NOT NULL 判斷
+    // 「有沒有選學校 / 有沒有填班級」，空字串會讓那條檢查限制式形同虛設。
     const payload = {
-      student_name: parsed.data.student_name,
-      student_gender: parsed.data.student_gender,
-      student_birthday: parsed.data.student_birthday,
-      school_id: parsed.data.school_id === '' ? null : parsed.data.school_id,
-      school_name_raw:
-        parsed.data.school_name_raw === '' ? null : parsed.data.school_name_raw,
-      grade: parsed.data.grade,
-      class_name: parsed.data.class_name === '' ? null : parsed.data.class_name,
+      student_name: snapshot.name,
+      student_gender: snapshot.gender,
+      student_birthday: snapshot.birthday,
+      school_id: snapshot.school_id,
+      school_name_raw: snapshot.school_name_raw,
+      grade: snapshot.grade,
+      class_name: snapshot.class_name,
       parent_name: parsed.data.parent_name,
       relation: parsed.data.relation,
       contact_phone: parsed.data.contact_phone,
     };
 
     setSubmitting(true);
+
+    // 新報名而且是新孩子：先把孩子建起來，拿到代碼才能寫報名
+    if (!isEditing && showStudentForm) {
+      const created = await createStudent({
+        parent_id: user.id,
+        name: snapshot.name,
+        gender: snapshot.gender,
+        birthday: snapshot.birthday,
+        school_id: snapshot.school_id,
+        school_name_raw: snapshot.school_name_raw,
+        grade: snapshot.grade,
+        class_name: snapshot.class_name,
+      });
+      if (!created.id) {
+        // 這個 return 不可省：孩子沒建起來就寫報名，會撞外鍵錯誤
+        setSubmitting(false);
+        setError(created.error ?? '新增失敗，請稍後再試');
+        return;
+      }
+      studentId = created.id;
+    }
+
     const { error: submitError } = isEditing
       ? await updateRegistration(editId!, payload)
-      : await createRegistration({ ...payload, parent_id: user.id });
+      : await createRegistration({
+          ...payload,
+          parent_id: user.id,
+          student_id: studentId,
+        });
     setSubmitting(false);
 
     if (submitError) {
@@ -166,128 +257,65 @@ export default function ApplyPage() {
         )}
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-6" noValidate>
-          <FormSection step={1} title="學生資訊">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label
-                  htmlFor="student_name"
-                  className="block text-sm font-medium text-slate-700"
-                >
-                  學生姓名
-                </label>
-                <input
-                  id="student_name"
-                  type="text"
-                  value={studentName}
-                  onChange={studentNameIme.onChange}
-                  onCompositionStart={studentNameIme.onCompositionStart}
-                  onCompositionEnd={studentNameIme.onCompositionEnd}
-                  className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-                />
-              </div>
-
-              <fieldset>
-                <legend className="text-sm font-medium text-slate-700">性別</legend>
-                <div className="mt-2 flex gap-3">
-                  {(['male', 'female'] as const).map((option) => (
-                    <label
-                      key={option}
-                      className={`flex-1 cursor-pointer rounded-xl border px-4 py-2.5 text-center text-sm transition ${
-                        gender === option
-                          ? 'border-brand-600 bg-brand-50 text-brand-700'
-                          : 'border-slate-300 bg-white text-slate-600'
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="gender"
-                        className="sr-only"
-                        checked={gender === option}
-                        onChange={() => setGender(option)}
-                        aria-label={option === 'male' ? '男' : '女'}
-                      />
-                      {option === 'male' ? '男' : '女'}
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-
-              <div>
-                <label
-                  htmlFor="birthday"
-                  className="block text-sm font-medium text-slate-700"
-                >
-                  生日
-                </label>
-                <input
-                  id="birthday"
-                  type="date"
-                  value={birthday}
-                  onChange={(event) => setBirthday(event.target.value)}
-                  className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-                />
-              </div>
-
-              <div>
-                {/*
-                  「（選填）」提示刻意放在 label 外面而不是塞進 <label> 裡當子節點：
-                  測試工具（testing-library）算 label 的可存取名稱時，會把 <label>
-                  底下所有子節點的文字全部串起來，塞在裡面會讓 getByLabelText('班級')
-                  比對到「班級（選填）」而找不到欄位。抽成同一行的相鄰元素，
-                  可存取名稱仍是單純的「班級」；再用 aria-describedby 把提示
-                  跟輸入框語意連結起來，螢幕閱讀器使用者用 Tab 逐欄位填表時
-                  才聽得到「選填」，不會誤以為這是必填欄位。
-                */}
-                <div className="flex items-center justify-between">
-                  <label
-                    htmlFor="class_name"
-                    className="block text-sm font-medium text-slate-700"
+          <FormSection
+            step={1}
+            title={showStudentForm && !isEditing ? '新增孩子' : '學生資訊'}
+          >
+            {showStudentForm ? (
+              <>
+                <StudentForm value={studentDraft} onChange={setStudentDraft} />
+                {addingNew && students.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setAddingNew(false)}
+                    className="mt-4 text-sm text-brand-600 underline"
                   >
-                    班級
+                    改為挑選既有的孩子
+                  </button>
+                )}
+              </>
+            ) : (
+              <div className="space-y-3">
+                {students.map((student) => (
+                  <label
+                    key={student.id}
+                    className={`flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 transition ${
+                      selectedStudentId === student.id
+                        ? 'border-brand-600 bg-brand-50'
+                        : 'border-slate-300 bg-white'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="student"
+                      className="mt-1"
+                      checked={selectedStudentId === student.id}
+                      onChange={() => setSelectedStudentId(student.id)}
+                    />
+                    <span>
+                      <span className="block font-semibold text-slate-900">
+                        {student.name}
+                      </span>
+                      <span className="block text-sm text-slate-500">
+                        {formatGrade(student.grade)}
+                        {' · '}
+                        {student.school_name ?? student.school_name_raw}
+                      </span>
+                    </span>
                   </label>
-                  <span id="class_name-optional" className="text-xs font-normal text-slate-400">
-                    （選填）
-                  </span>
-                </div>
-                <input
-                  id="class_name"
-                  type="text"
-                  value={className}
-                  onChange={classNameIme.onChange}
-                  onCompositionStart={classNameIme.onCompositionStart}
-                  onCompositionEnd={classNameIme.onCompositionEnd}
-                  aria-describedby="class_name-optional"
-                  placeholder="例如：忠班"
-                  className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-                />
-              </div>
-            </div>
-          </FormSection>
-
-          <FormSection step={2} title="就讀學校">
-            <SchoolSelector value={school} onChange={handleSchoolChange} />
-
-            <div className="mt-4 sm:max-w-xs">
-              <label htmlFor="grade" className="block text-sm font-medium text-slate-700">
-                年級
-              </label>
-              <select
-                id="grade"
-                value={grade}
-                onChange={(event) => setGrade(event.target.value)}
-                className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-              >
-                <option value="">請選擇</option>
-                {getGradeOptions(school.level).map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
                 ))}
-              </select>
-            </div>
+                <button
+                  type="button"
+                  onClick={startAddNew}
+                  className="text-sm text-brand-600 underline"
+                >
+                  改為新增一位孩子
+                </button>
+              </div>
+            )}
           </FormSection>
 
-          <FormSection step={3} title="家長資訊">
+          <FormSection step={2} title="家長資訊">
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label
@@ -367,8 +395,8 @@ export default function ApplyPage() {
 }
 
 /*
-  表單的一段。編號徽章與標題下的分隔線是為了讓家長一眼看出「總共三段、
-  現在在第幾段」—— 原本三段共用同一種白卡片、標題大小也一樣，整頁看
+  表單的一段。編號徽章與標題下的分隔線是為了讓家長一眼看出「總共幾段、
+  現在在第幾段」—— 各段共用同一種白卡片、標題大小也一樣的話，整頁看
   起來只是一長串欄位。
 */
 function FormSection({

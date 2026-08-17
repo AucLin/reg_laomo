@@ -4,7 +4,9 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import ApplyPage from '../ApplyPage';
 import * as registrationsModule from '../../lib/registrations';
+import * as studentsModule from '../../lib/students';
 import * as useAuthModule from '../../auth/useAuth';
+import type { StudentWithSchool } from '../../lib/types';
 
 vi.mock('../../components/SchoolSelector', () => ({
   default: ({
@@ -52,6 +54,9 @@ function renderPage(path = '/apply') {
 
 describe('ApplyPage', () => {
   beforeEach(() => {
+    // 這份檔案的間諜是逐條測試重新設定的，但呼叫紀錄會累積 ——
+    // 不清掉的話，後面用 not.toHaveBeenCalled() 的案例會被前面的呼叫誤判
+    vi.clearAllMocks();
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
       user: { id: 'parent-1' } as never,
       profile: {
@@ -68,7 +73,36 @@ describe('ApplyPage', () => {
     vi.spyOn(registrationsModule, 'createRegistration').mockResolvedValue({
       error: null,
     });
+    // 預設「還沒有任何孩子」，這時頁面直接展開新增表單，
+    // 也就是這份測試檔既有案例填的那張表
+    vi.spyOn(studentsModule, 'listMyStudents').mockResolvedValue([]);
+    vi.spyOn(studentsModule, 'createStudent').mockResolvedValue({
+      id: 'student-1',
+      error: null,
+    });
   });
+
+  function makeStudent(
+    overrides: Partial<StudentWithSchool> = {}
+  ): StudentWithSchool {
+    return {
+      id: 'student-1',
+      parent_id: 'parent-1',
+      name: '林小明',
+      gender: 'male',
+      birthday: '2016-05-20',
+      school_id: 'school-1',
+      school_name_raw: null,
+      grade: 'E4',
+      class_name: '忠班',
+      created_at: '2026-08-01T00:00:00Z',
+      updated_at: '2026-08-01T00:00:00Z',
+      school_name: '臺北市立中正國小',
+      school_city: '臺北市',
+      school_level: 'elementary',
+      ...overrides,
+    };
+  }
 
   it('家長姓名與電話預先帶入註冊時填的資料', () => {
     renderPage();
@@ -258,5 +292,54 @@ describe('ApplyPage', () => {
 
     fireEvent.change(birthdayInput, { target: { value: '2016-05-20' } });
     expect(nameInput.value).toBe('林小明');
+  });
+
+  it('已經有孩子時改用挑的，不必再打一次資料', async () => {
+    const user = userEvent.setup();
+    vi.mocked(studentsModule.listMyStudents).mockResolvedValue([makeStudent()]);
+    renderPage();
+
+    // 只有一個孩子就先幫他選好，家長只要填家長資訊
+    expect(await screen.findByText('林小明')).toBeInTheDocument();
+    expect(screen.queryByLabelText('學生姓名')).not.toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText('與學生關係'), 'father');
+    await user.click(screen.getByRole('button', { name: '送出報名' }));
+
+    await waitFor(() => {
+      expect(registrationsModule.createRegistration).toHaveBeenCalledWith(
+        expect.objectContaining({
+          student_id: 'student-1',
+          student_name: '林小明',
+          grade: 'E4',
+          school_id: 'school-1',
+        })
+      );
+    });
+    // 挑既有孩子不該再建一個一模一樣的
+    expect(studentsModule.createStudent).not.toHaveBeenCalled();
+  });
+
+  it('建立孩子失敗時不建立報名', async () => {
+    const user = userEvent.setup();
+    vi.mocked(studentsModule.createStudent).mockResolvedValue({
+      id: null,
+      error: '新增失敗，請稍後再試',
+    });
+    renderPage();
+
+    await user.type(screen.getByLabelText('學生姓名'), '林小明');
+    await user.click(screen.getByLabelText('男'));
+    await user.type(screen.getByLabelText('生日'), '2016-05-20');
+    await user.click(screen.getByRole('button', { name: '模擬選擇學校' }));
+    await user.selectOptions(screen.getByLabelText('年級'), 'E4');
+    await user.selectOptions(screen.getByLabelText('與學生關係'), 'father');
+    await user.click(screen.getByRole('button', { name: '送出報名' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      '新增失敗，請稍後再試'
+    );
+    // 孩子沒建起來就寫報名會撞外鍵錯誤
+    expect(registrationsModule.createRegistration).not.toHaveBeenCalled();
   });
 });

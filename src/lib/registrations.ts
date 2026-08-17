@@ -9,6 +9,8 @@ import type {
 
 export interface NewRegistration {
   parent_id: string;
+  /** 這筆報名屬於哪個孩子；學生欄位仍逐欄保留，那是送出當下的快照 */
+  student_id: string;
   student_name: string;
   student_gender: Gender;
   student_birthday: string;

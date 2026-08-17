@@ -4,8 +4,9 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MyRegistrationsPage from '../MyRegistrationsPage';
 import * as registrationsModule from '../../lib/registrations';
+import * as studentsModule from '../../lib/students';
 import * as useAuthModule from '../../auth/useAuth';
-import type { RegistrationWithSchool } from '../../lib/types';
+import type { RegistrationWithSchool, StudentWithSchool } from '../../lib/types';
 
 function makeRegistration(
   overrides: Partial<RegistrationWithSchool> = {}
@@ -13,6 +14,7 @@ function makeRegistration(
   return {
     id: 'reg-1',
     parent_id: 'parent-1',
+    student_id: null,
     student_name: '林小明',
     student_gender: 'male',
     student_birthday: '2016-05-20',
@@ -33,6 +35,28 @@ function makeRegistration(
   };
 }
 
+function makeStudent(
+  overrides: Partial<StudentWithSchool> = {}
+): StudentWithSchool {
+  return {
+    id: 'student-1',
+    parent_id: 'parent-1',
+    name: '林小明',
+    gender: 'male',
+    birthday: '2016-05-20',
+    school_id: 'school-1',
+    school_name_raw: null,
+    grade: 'E4',
+    class_name: '忠班',
+    created_at: '2026-08-01T00:00:00Z',
+    updated_at: '2026-08-01T00:00:00Z',
+    school_name: '臺北市立中正國小',
+    school_city: '臺北市',
+    school_level: 'elementary',
+    ...overrides,
+  };
+}
+
 function renderPage() {
   return render(
     <MemoryRouter>
@@ -44,6 +68,8 @@ function renderPage() {
 describe('MyRegistrationsPage', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    // 這一頁掛載時同時讀報名與孩子，孩子沒 mock 的話會打到真的 Supabase
+    vi.spyOn(studentsModule, 'listMyStudents').mockResolvedValue([]);
     vi.spyOn(useAuthModule, 'useAuth').mockReturnValue({
       user: { id: 'parent-1', email: 'parent@example.com' } as never,
       profile: {
@@ -247,5 +273,49 @@ describe('MyRegistrationsPage', () => {
 
     expect(await screen.findByText('您還沒有任何報名紀錄')).toBeInTheDocument();
     expect(screen.queryByText('林小明')).not.toBeInTheDocument();
+  });
+
+  describe('我的孩子', () => {
+    it('列出孩子的姓名、年級與學校', async () => {
+      vi.spyOn(registrationsModule, 'listMyRegistrations').mockResolvedValue([]);
+      vi.mocked(studentsModule.listMyStudents).mockResolvedValue([makeStudent()]);
+      renderPage();
+
+      expect(await screen.findByText('林小明')).toBeInTheDocument();
+      expect(screen.getByText(/國小四年級/)).toBeInTheDocument();
+      expect(screen.getByText('臺北市立中正國小')).toBeInTheDocument();
+    });
+
+    /*
+      資料庫的外鍵是 ON DELETE RESTRICT，有報名紀錄的孩子按下刪除只會
+      拿到外鍵錯誤。與其讓家長撞牆，不如一開始就不給按。
+    */
+    it('孩子有報名紀錄時不給刪除，改顯示報名筆數', async () => {
+      vi.spyOn(registrationsModule, 'listMyRegistrations').mockResolvedValue([
+        makeRegistration({ student_id: 'student-1' }),
+      ]);
+      vi.mocked(studentsModule.listMyStudents).mockResolvedValue([makeStudent()]);
+      renderPage();
+
+      await screen.findByText('已有 1 筆報名紀錄，如需更正請聯繫我們');
+      expect(screen.queryByRole('button', { name: '刪除' })).not.toBeInTheDocument();
+    });
+
+    it('沒有報名紀錄的孩子才給刪除，而且要二次確認', async () => {
+      const user = userEvent.setup();
+      vi.spyOn(registrationsModule, 'listMyRegistrations').mockResolvedValue([]);
+      vi.mocked(studentsModule.listMyStudents).mockResolvedValue([makeStudent()]);
+      const deleteSpy = vi
+        .spyOn(studentsModule, 'deleteStudent')
+        .mockResolvedValue({ error: null });
+      renderPage();
+
+      await user.click(await screen.findByRole('button', { name: '刪除' }));
+      // 第一下只是展開確認，不能真的刪 —— 與「撤回報名」是同一套互動
+      expect(deleteSpy).not.toHaveBeenCalled();
+
+      await user.click(screen.getByRole('button', { name: '確定刪除' }));
+      expect(deleteSpy).toHaveBeenCalledWith('student-1');
+    });
   });
 });
