@@ -110,9 +110,101 @@ Supabase 要的是 SMTP 形式的帳密，對應關係是：
 </p>
 ```
 
-同樣建議一併改的還有 **Reset password**（重設密碼）與 **Magic Link**（如果之後會用到）。
-
 `{{ .ConfirmationURL }}` 是 Supabase 的變數，**不要改動**，它會被換成實際的驗證連結。
+
+---
+
+#### 重設密碼（Reset password）
+
+家長忘記密碼時會收到這封。**這封一定要改**，因為它是家長第二常收到的信。
+
+**主旨**：
+
+```
+重設您的密碼 — 老莫機器人教育中心
+```
+
+**內容**：
+
+```html
+<h2>重設密碼</h2>
+
+<p>您好，我們收到了重設密碼的要求。</p>
+
+<p>請點選下面的連結設定新密碼，連結在一小時內有效：</p>
+
+<p>
+  <a href="{{ .ConfirmationURL }}"
+     style="display:inline-block;padding:12px 24px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;">
+    設定新密碼
+  </a>
+</p>
+
+<p style="color:#64748b;font-size:14px;">
+  如果按鈕沒有反應，請複製下面的網址貼到瀏覽器：<br>
+  {{ .ConfirmationURL }}
+</p>
+
+<hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;">
+
+<p style="color:#64748b;font-size:14px;">
+  如果這不是您本人的操作，請忽略這封信，您的密碼不會有任何變動。
+</p>
+```
+
+---
+
+#### 變更信箱（Change Email Address）
+
+家長改註冊信箱時，新舊兩個信箱都會收到。
+
+**主旨**：
+
+```
+確認您的新信箱 — 老莫機器人教育中心
+```
+
+**內容**：
+
+```html
+<h2>確認新的信箱地址</h2>
+
+<p>您好，我們收到了將帳號信箱從 {{ .Email }} 變更為 {{ .NewEmail }} 的要求。</p>
+
+<p>請點選下面的連結完成確認：</p>
+
+<p>
+  <a href="{{ .ConfirmationURL }}"
+     style="display:inline-block;padding:12px 24px;background:#2563eb;color:#fff;text-decoration:none;border-radius:8px;">
+    確認變更
+  </a>
+</p>
+
+<p style="color:#64748b;font-size:14px;">
+  如果按鈕沒有反應，請複製下面的網址貼到瀏覽器：<br>
+  {{ .ConfirmationURL }}
+</p>
+
+<hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;">
+
+<p style="color:#64748b;font-size:14px;">
+  如果這不是您本人的操作，請立即聯絡老莫機器人教育中心。
+</p>
+```
+
+---
+
+#### 用不到的兩封
+
+**Magic Link**（免密碼登入）與 **Invite user**（邀請使用者）目前的系統沒有用到——登入方式只開了信箱加密碼，管理員也是直接改資料庫的角色欄位。這兩封可以先不管，之後真的要用再改。
+
+---
+
+#### 貼上時的注意事項
+
+- **變數不要動**：`{{ .ConfirmationURL }}`、`{{ .Email }}`、`{{ .NewEmail }}` 都是 Supabase 會替換的變數，連大小寫和空格都要照原樣。
+- **改完按 Save**，每一封範本都是獨立儲存的。
+- 改完先寄一封給自己看實際效果——範本編輯器裡的預覽不會渲染樣式。
 
 ---
 
