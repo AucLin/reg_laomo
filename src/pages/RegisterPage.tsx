@@ -2,6 +2,7 @@ import { useRef, useState, type CompositionEvent, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { isValidTaiwanPhone } from '../lib/validation/phone';
+import EmailField from '../components/EmailField';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -66,6 +67,13 @@ export default function RegisterPage() {
       password,
       options: {
         data: { full_name: fullName.trim(), phone: phone.trim() },
+        /*
+          確認信裡的連結預設會導回 Supabase 設定的 Site URL，也就是進入頁。
+          家長點完驗證只會看到首頁，沒有任何「驗證成功」的訊號，看起來
+          像什麼都沒發生 —— 實測就是這樣被誤判成失敗的。改成直接落在
+          報名表，驗證成功與下一步要做什麼都不必解釋。
+        */
+        emailRedirectTo: `${window.location.origin}/apply`,
       },
     });
     setSubmitting(false);
@@ -147,14 +155,7 @@ export default function RegisterPage() {
             autoComplete="tel"
             placeholder="0912345678"
           />
-          <Field
-            id="email"
-            label="電子信箱"
-            value={email}
-            onChange={setEmail}
-            type="email"
-            autoComplete="email"
-          />
+          <EmailField value={email} onChange={setEmail} />
           <Field
             id="password"
             label="密碼"

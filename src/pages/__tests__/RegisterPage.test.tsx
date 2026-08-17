@@ -92,6 +92,8 @@ describe('RegisterPage', () => {
       password: 'password123',
       options: {
         data: { full_name: '林大明', phone: '0912345678' },
+        // 驗證後直接落在報名表，不是丟回進入頁讓家長猜有沒有成功
+        emailRedirectTo: `${window.location.origin}/apply`,
       },
     });
   });
@@ -128,6 +130,7 @@ describe('RegisterPage', () => {
       password: 'password123',
       options: {
         data: { full_name: '王小明', phone: '0912345678' },
+        emailRedirectTo: `${window.location.origin}/apply`,
       },
     });
   });
