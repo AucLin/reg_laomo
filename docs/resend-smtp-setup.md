@@ -10,13 +10,18 @@ Supabase 內建的寄信服務**一小時只能寄 2 到 4 封**，而且明文�
 
 ---
 
-## 第一步：Resend 這邊
+## 第一步：Resend 這邊（大部分已經完成）
 
-### 1. 建立帳號與驗證寄件網域
+### 1. 寄件網域 — 已驗證，不用再做
 
-到 https://resend.com 註冊，進入 **Domains** → **Add Domain**，填入你要用來寄信的網域（例如 `example.org`，或用子網域 `mail.example.org` 把行銷信與系統信分開）。
+這個 Resend 帳號底下的 **`example.org` 已經是 verified 狀態**（東京區 `ap-northeast-1`，2026-01-12 建立），DNS 記錄都設好了，可以直接拿來寄信。
 
-Resend 會給你幾筆 DNS 記錄，到網域註冊商的 DNS 設定頁面加進去：
+所以下面這段 DNS 設定**你不用做**，留著供日後要換網域時參考：
+
+<details>
+<summary>從零開始驗證新網域的話要做什麼（點開）</summary>
+
+到 https://resend.com 的 **Domains** → **Add Domain**，填入網域後，Resend 會給你幾筆 DNS 記錄，到網域註冊商的設定頁面加進去：
 
 | 類型 | 用途 | 一定要加嗎 |
 |---|---|---|
@@ -25,17 +30,23 @@ Resend 會給你幾筆 DNS 記錄，到網域註冊商的 DNS 設定頁面加進
 | TXT（DKIM） | 信件簽章，沒有的話會被判垃圾信 | 是 |
 | TXT（DMARC） | 收件方的處理政策 | 建議加 |
 
-DNS 生效通常幾分鐘到幾小時。Resend 的 Domains 頁面狀態變成 **Verified** 才算完成。
+DNS 生效通常幾分鐘到幾小時，狀態變成 **Verified** 才算完成。
 
-> **注意**：沒有驗證網域也能用 Resend 的測試網域 `onboarding@resend.dev` 寄信，但那只能寄給你自己的註冊信箱，家長收不到。正式上線一定要驗證自己的網域。
+沒有驗證網域也能用 Resend 的測試網域 `onboarding@resend.dev`，但那只能寄給帳號本人，家長收不到。
 
-### 2. 取得 SMTP 憑證
+</details>
 
-到 **API Keys** → **Create API Key**，權限選 **Sending access**，名稱填 `supabase-auth` 之類好認的。
+### 2. API 金鑰 — 沿用現有的就好
 
-**金鑰只會顯示這一次**，先複製起來。
+API 金鑰請自己在 Resend 後台開一把（見下一段）。
 
-Supabase 要的是 SMTP 形式的帳密，對應關係是：
+要新開一把也可以：**API Keys** → **Create API Key**，權限選 **Sending access**。**金鑰只會顯示這一次**，當下就要複製。
+
+分開用不同金鑰的好處是日後可以單獨作廢某一支服務的權限，不會波及其他專案。你自己權衡。
+
+### 3. 換算成 SMTP 帳密
+
+Supabase 要的是 SMTP 形式，對應關係是：
 
 | Supabase 欄位 | 要填什麼 |
 |---|---|
@@ -54,12 +65,16 @@ Supabase 要的是 SMTP 形式的帳密，對應關係是：
 
 **Project Settings** → **Authentication** → 往下找 **SMTP Settings** → 打開 **Enable Custom SMTP**：
 
-- **Sender email**：`noreply@你的網域`（必須是上一步驗證過的網域）
-- **Sender name**：`老莫機器人教育中心`
-- **Host**：`smtp.resend.com`
-- **Port**：`465`
-- **Username**：`resend`
-- **Password**：你的 Resend API Key
+| 欄位 | 填什麼 |
+|---|---|
+| Sender email | `noreply@example.org` |
+| Sender name | `老莫機器人教育中心` |
+| Host | `smtp.resend.com` |
+| Port | `465` |
+| Username | `resend` |
+| Password | 你的 Resend API Key（`re_` 開頭那串） |
+
+`example.org` 已驗證，所以 Sender email 用這個網域底下的任何位址都可以（`noreply@`、`service@`、`robot@` 都行，收件方看到的就是這個）。
 
 按 **Save**。
 
