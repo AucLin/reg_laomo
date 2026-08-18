@@ -370,38 +370,41 @@ export default function AdminTrainingPage() {
             type="button"
             onClick={() => setRollCallFor(open ? null : session.id)}
             aria-expanded={open}
-            className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 rounded-xl px-2 py-2 text-left transition hover:bg-slate-100/70"
+            className="flex min-w-0 flex-1 items-start gap-2 rounded-xl px-2 py-2 text-left transition hover:bg-slate-100/70"
           >
             <ChevronRight
-              className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${
+              className={`mt-0.5 h-4 w-4 shrink-0 text-slate-400 transition-transform ${
                 open ? 'rotate-90' : ''
               }`}
               aria-hidden="true"
             />
-            <span className={`font-semibold ${past ? 'text-slate-500' : 'text-slate-900'}`}>
-              {shortDate}
-            </span>
-            <span
-              className={`tabular-nums text-sm ${past ? 'text-slate-400' : 'text-slate-600'}`}
-            >
-              {formatTime(session.start_time)}–{formatTime(session.end_time)}
-            </span>
-            <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${badge}`}>
-              {count > 0
-                ? past
-                  ? `${count} 人`
-                  : `${count} 人會來`
-                : past
-                  ? '沒人來'
-                  : '還沒人挑'}
-            </span>
-            {/* 備註在列上只露一行，展開後才看得到全文 */}
-            {session.note && !open && (
-              <span className="flex min-w-0 items-center gap-1 text-xs text-amber-700">
-                <StickyNote className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                <span className="truncate">{session.note}</span>
+            {/* 手機上放不下會換行，內容包成一組才不會掉到箭頭底下 */}
+            <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
+              <span className={`font-semibold ${past ? 'text-slate-500' : 'text-slate-900'}`}>
+                {shortDate}
               </span>
-            )}
+              <span
+                className={`tabular-nums text-sm ${past ? 'text-slate-400' : 'text-slate-600'}`}
+              >
+                {formatTime(session.start_time)}–{formatTime(session.end_time)}
+              </span>
+              <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${badge}`}>
+                {count > 0
+                  ? past
+                    ? `${count} 人`
+                    : `${count} 人會來`
+                  : past
+                    ? '沒人來'
+                    : '還沒人挑'}
+              </span>
+              {/* 備註在列上只露一行，展開後才看得到全文 */}
+              {session.note && !open && (
+                <span className="flex min-w-0 items-center gap-1 text-xs text-amber-700">
+                  <StickyNote className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  <span className="truncate">{session.note}</span>
+                </span>
+              )}
+            </span>
           </button>
 
           <button
