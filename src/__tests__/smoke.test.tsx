@@ -20,8 +20,8 @@ vi.mock('../lib/contests', () => ({
 }));
 
 describe('App', () => {
-  it('進入頁顯示工作室名稱', async () => {
+  it('進入頁顯示品牌名稱', async () => {
     render(<App />);
-    expect(await screen.findByText('老莫機器人工作室')).toBeInTheDocument();
+    expect(await screen.findByText('老莫機器人')).toBeInTheDocument();
   });
 });

@@ -140,7 +140,7 @@ function Sidebar({
           {/* 家長端那面的機器人，後台放一顆小的，兩邊看得出是同一家 */}
           <RobotMarkDoodle className="h-8 w-8 shrink-0 text-brand-200" />
           <div className="min-w-0">
-            <p className="truncate text-sm font-bold text-white">老莫機器人工作室</p>
+            <p className="truncate text-sm font-bold text-white">老莫機器人</p>
             <p className="text-xs text-slate-400">後台管理</p>
           </div>
         </div>

@@ -23,10 +23,10 @@ function renderPage() {
 }
 
 describe('LandingPage', () => {
-  it('顯示工作室名稱', () => {
+  it('顯示品牌名稱', () => {
     mockAuth(false);
     renderPage();
-    expect(screen.getByText('老莫機器人工作室')).toBeInTheDocument();
+    expect(screen.getByText('老莫機器人')).toBeInTheDocument();
   });
 
   it('未登入時報名按鈕導向註冊頁', () => {
