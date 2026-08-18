@@ -390,7 +390,7 @@ export default function AdminTrainingPage() {
               key={session.id}
               className={`rounded-2xl p-5 shadow-sm ring-1 ${
                 past
-                  ? 'bg-slate-50 ring-slate-200/60'
+                  ? 'border-l-4 border-slate-300 bg-slate-50 ring-slate-200/60'
                   : 'border-l-4 border-brand-500 bg-white ring-slate-200/80'
               }`}
             >
