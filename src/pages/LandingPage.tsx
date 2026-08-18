@@ -59,7 +59,7 @@ export default function LandingPage() {
         */}
         <span className="flex min-w-0 items-center gap-2 text-lg font-bold text-slate-900">
           <RobotMarkDoodle className="h-8 w-8 shrink-0 text-brand-600" />
-          老莫機器人教育中心
+          老莫機器人工作室
         </span>
         <nav className="flex items-center gap-3 text-sm">
           {isAdmin && (
@@ -101,7 +101,7 @@ export default function LandingPage() {
               <Squiggle className="text-amber-400" />
             </div>
             <p className="mt-4 max-w-md text-base leading-relaxed text-slate-200 sm:text-lg">
-              從積木、電路到程式，老莫機器人教育中心陪孩子把想像變成真的會動的作品。
+              從積木、電路到程式，老莫機器人工作室陪孩子把想像變成真的會動的作品。
             </p>
             <Link
               to={user ? '/apply' : '/register'}
@@ -237,7 +237,7 @@ export default function LandingPage() {
       </section>
 
       <footer className="border-t-2 border-slate-900/10 py-8 text-center text-sm text-slate-600">
-        © 老莫機器人教育中心
+        © 老莫機器人工作室
       </footer>
     </div>
   );

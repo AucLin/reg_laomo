@@ -33,7 +33,7 @@ export default function AppHeader() {
     <header className="border-b border-slate-200 bg-white">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-3">
         <Link to="/" className="text-base font-bold text-slate-900 sm:text-lg">
-          老莫機器人教育中心
+          老莫機器人工作室
         </Link>
 
         <div className="flex items-center gap-2 text-xs sm:gap-4 sm:text-sm">

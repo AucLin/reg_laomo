@@ -116,7 +116,7 @@ function Sidebar({
       <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
         <div className="min-w-0">
           <p className="truncate text-sm font-bold text-slate-900">
-            老莫機器人教育中心
+            老莫機器人工作室
           </p>
           <p className="text-xs text-slate-500">後台管理</p>
         </div>

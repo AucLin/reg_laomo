@@ -70,7 +70,7 @@ export default function LoginPage() {
           className="mx-auto mb-5 flex w-fit items-center gap-2 text-sm font-semibold text-slate-600 transition hover:text-brand-700"
         >
           <Spark className="h-4 w-4 shrink-0 text-amber-400" />
-          回老莫機器人教育中心首頁
+          回老莫機器人工作室首頁
         </Link>
 
         <div className="doodle-card overflow-hidden">
