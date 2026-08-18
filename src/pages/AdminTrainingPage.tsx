@@ -1,5 +1,14 @@
 import { useEffect, useState } from 'react';
-import { CalendarPlus, CalendarRange, Check, Trash2, X } from 'lucide-react';
+import {
+  CalendarPlus,
+  CalendarRange,
+  Check,
+  ChevronRight,
+  Pencil,
+  StickyNote,
+  Trash2,
+  X,
+} from 'lucide-react';
 import AdminPageHeader from '../components/admin/AdminPageHeader';
 import Spinner, { PageLoading } from '../components/Spinner';
 import { useImeGuardedInput } from '../lib/hooks/useImeGuardedInput';
@@ -58,8 +67,8 @@ const EMPTY_FORM: SessionForm = {
   note: '',
 };
 
-/** 9/6（六）。預覽只是要讓人認出是哪幾天，年份寫出來反而擠 */
-function formatPreviewDate(date: string): string {
+/** 9/6（六）。同一期集訓都在眼前這幾週，年份寫出來只是雜訊 */
+function formatShortDate(date: string): string {
   const [, month, day] = date.split('-').map(Number);
   const weekday = WEEKDAY_LABELS[new Date(`${date}T00:00:00Z`).getUTCDay()];
   return `${month}/${day}（${weekday}）`;
@@ -100,6 +109,7 @@ export default function AdminTrainingPage() {
 
   // 展開哪一場的點名畫面
   const [rollCallFor, setRollCallFor] = useState<string | null>(null);
+  const [showFinished, setShowFinished] = useState<boolean | null>(null);
 
   /*
     每一場有幾個孩子挑了，鍵是場次 id。老莫排完時段最想知道的就是這個
@@ -318,6 +328,144 @@ export default function AdminTrainingPage() {
   // 邊填邊算，讓老莫在按下去之前就看到會排出哪幾天
   const plan = series ? planSeries(series, sessions) : null;
 
+  /*
+    接下來要上的排前面，已經上完的收在後面 —— 老莫每天要看的是前者。
+    整場比賽都上完時把後者攤開，不然畫面上會只剩一個標題。
+  */
+  const upcoming = sessions.filter((session) => !isPast(session));
+  const finished = sessions.filter(isPast);
+  const finishedOpen = showFinished ?? upcoming.length === 0;
+
+  /*
+    一場一列。
+
+    一期集訓十幾場，每一場一張大卡片就是十幾次捲動 —— 老莫要找的通常
+    是「下一場是哪天、幾個人」，那三件事應該在同一行看完。修改與刪除
+    收成圖示，名單點整列展開。
+  */
+  function renderRow(session: TrainingSession) {
+    const past = isPast(session);
+    const count = signupCounts.get(session.id) ?? 0;
+    const open = rollCallFor === session.id;
+    const confirming = confirmingDeleteId === session.id;
+    const shortDate = formatShortDate(session.session_date);
+
+    /*
+      人數徽章分三種顏色：有人挑是藍的、還沒開始卻沒人挑是黃的（該打
+      電話問家長了）、已經上完的就只是灰色紀錄。
+    */
+    const badge =
+      count > 0
+        ? past
+          ? 'bg-slate-200 text-slate-700'
+          : 'bg-brand-100 text-brand-800'
+        : past
+          ? 'bg-slate-100 text-slate-500'
+          : 'bg-amber-100 text-amber-800';
+
+    return (
+      <li key={session.id} className={past ? 'bg-slate-50/70' : ''}>
+        <div className="flex items-center gap-1 px-2 py-1.5 sm:px-3">
+          <button
+            type="button"
+            onClick={() => setRollCallFor(open ? null : session.id)}
+            aria-expanded={open}
+            className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 rounded-xl px-2 py-2 text-left transition hover:bg-slate-100/70"
+          >
+            <ChevronRight
+              className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${
+                open ? 'rotate-90' : ''
+              }`}
+              aria-hidden="true"
+            />
+            <span className={`font-semibold ${past ? 'text-slate-500' : 'text-slate-900'}`}>
+              {shortDate}
+            </span>
+            <span
+              className={`tabular-nums text-sm ${past ? 'text-slate-400' : 'text-slate-600'}`}
+            >
+              {formatTime(session.start_time)}–{formatTime(session.end_time)}
+            </span>
+            <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${badge}`}>
+              {count > 0
+                ? past
+                  ? `${count} 人`
+                  : `${count} 人會來`
+                : past
+                  ? '沒人來'
+                  : '還沒人挑'}
+            </span>
+            {/* 備註在列上只露一行，展開後才看得到全文 */}
+            {session.note && !open && (
+              <span className="flex min-w-0 items-center gap-1 text-xs text-amber-700">
+                <StickyNote className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span className="truncate">{session.note}</span>
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => startEdit(session)}
+            aria-label={`修改 ${shortDate} 這場`}
+            title="修改"
+            className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+          >
+            <Pencil className="h-4 w-4" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setConfirmingDeleteId(confirming ? null : session.id)}
+            aria-label={`刪除 ${shortDate} 這場`}
+            title="刪除"
+            className="rounded-lg p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+          >
+            <Trash2 className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
+
+        {confirming && (
+          <div className="flex flex-wrap items-center gap-3 bg-red-50 px-4 py-3 text-sm">
+            <span className="text-red-800">刪掉這場？這場的點名紀錄會一併刪除。</span>
+            <button
+              type="button"
+              onClick={() => handleDelete(session.id)}
+              disabled={busySessionId === session.id}
+              className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-1.5 font-medium text-white transition hover:bg-red-700 disabled:opacity-60"
+            >
+              {busySessionId === session.id && <Spinner />}
+              確定刪除
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmingDeleteId(null)}
+              className="rounded-lg border border-slate-300 bg-white px-4 py-1.5 text-slate-600 transition hover:bg-slate-50"
+            >
+              取消
+            </button>
+          </div>
+        )}
+
+        {open && (
+          <div className="border-t border-slate-100">
+            {(session.location || session.note) && (
+              <div className="px-4 pt-3 text-sm">
+                {session.location && <p className="text-slate-600">{session.location}</p>}
+                {session.note && (
+                  <p className="mt-1 whitespace-pre-wrap break-words rounded-lg bg-amber-50 px-3 py-2 text-amber-900 ring-1 ring-amber-100">
+                    {session.note}
+                  </p>
+                )}
+              </div>
+            )}
+            <RollCall session={session} onError={setError} onChanged={reloadCounts} />
+          </div>
+        )}
+      </li>
+    );
+  }
+
+
   return (
     <>
       <AdminPageHeader
@@ -502,7 +650,7 @@ export default function AdminTrainingPage() {
             <div className="mt-4 rounded-xl bg-brand-50 px-4 py-3 text-sm ring-1 ring-brand-100">
               <p className="font-semibold text-brand-900">會排 {plan.dates.length} 場</p>
               <p className="mt-1 break-words text-brand-800">
-                {plan.dates.map(formatPreviewDate).join('、')}
+                {plan.dates.map(formatShortDate).join('、')}
               </p>
               {plan.skipped.length > 0 && (
                 <p className="mt-1 text-xs text-brand-700">
@@ -648,127 +796,41 @@ export default function AdminTrainingPage() {
           這場比賽還沒排集訓
         </p>
       ) : (
-        <ul className="mt-6 space-y-4">
-          {sessions.map((session) => {
-            const past = isPast(session);
-            const count = signupCounts.get(session.id) ?? 0;
+        <div className="mt-6 space-y-6">
+          {upcoming.length > 0 && (
+            <section>
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                <span className="h-2 w-2 rounded-full bg-brand-500" aria-hidden="true" />
+                接下來（{upcoming.length}）
+              </h2>
+              <ul className="mt-2 divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/80">
+                {upcoming.map(renderRow)}
+              </ul>
+            </section>
+          )}
 
-            return (
-            <li
-              key={session.id}
-              className={`rounded-2xl p-5 shadow-sm ring-1 ${
-                past
-                  ? 'border-l-4 border-slate-300 bg-slate-50 ring-slate-200/60'
-                  : 'border-l-4 border-brand-500 bg-white ring-slate-200/80'
-              }`}
-            >
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0 flex-1 break-words">
-                  <h2 className="flex flex-wrap items-center gap-2 font-semibold">
-                    <span className={past ? 'text-slate-500' : 'text-slate-900'}>
-                      {session.session_date}
-                    </span>
-                    <span
-                      className={`tabular-nums text-sm font-medium ${
-                        past ? 'text-slate-400' : 'text-slate-600'
-                      }`}
-                    >
-                      {formatTime(session.start_time)}–{formatTime(session.end_time)}
-                    </span>
-                    {/*
-                      沒人挑也要把數字寫出來，空白會被當成還沒載入。顏色分三種：
-                      有人挑是藍的、還沒開始卻沒人挑是黃的（該打電話問了）、
-                      已經上完的場次就只是灰色的紀錄。
-                    */}
-                    <span
-                      className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                        count > 0
-                          ? 'bg-brand-100 text-brand-800'
-                          : past
-                            ? 'bg-slate-200 text-slate-600'
-                            : 'bg-amber-100 text-amber-800'
-                      }`}
-                    >
-                      {count > 0 ? `${count} 人會來` : past ? '沒人來' : '還沒人挑'}
-                    </span>
-                    {past && (
-                      <span className="rounded-full bg-slate-200 px-2.5 py-0.5 text-xs font-medium text-slate-600">
-                        已結束
-                      </span>
-                    )}
-                  </h2>
-                  {session.location && (
-                    <p className="mt-1 text-sm text-slate-600">{session.location}</p>
-                  )}
-                  {session.note && (
-                    <p className="mt-2 whitespace-pre-wrap break-words rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900 ring-1 ring-amber-100">
-                      {session.note}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setRollCallFor(rollCallFor === session.id ? null : session.id)
-                  }
-                  className="rounded-lg border border-brand-500 px-4 py-2 text-sm font-medium text-brand-600 transition hover:bg-brand-50"
-                >
-                  {rollCallFor === session.id ? '收起名單' : '看名單 / 點名'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => startEdit(session)}
-                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50"
-                >
-                  修改
-                </button>
-                {confirmingDeleteId === session.id ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(session.id)}
-                      disabled={busySessionId === session.id}
-                      className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700 disabled:opacity-60"
-                    >
-                      {busySessionId === session.id && <Spinner />}
-                      確定刪除
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setConfirmingDeleteId(null)}
-                      className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50"
-                    >
-                      取消
-                    </button>
-                    <span className="text-sm text-red-700">
-                      這場的點名紀錄會一併刪除
-                    </span>
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setConfirmingDeleteId(session.id)}
-                    className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 transition hover:bg-slate-50"
-                  >
-                    刪除
-                  </button>
-                )}
-              </div>
-
-              {rollCallFor === session.id && (
-                <RollCall
-                  session={session}
-                  onError={setError}
-                  onChanged={reloadCounts}
+          {finished.length > 0 && (
+            <section>
+              <button
+                type="button"
+                onClick={() => setShowFinished(!finishedOpen)}
+                aria-expanded={finishedOpen}
+                className="flex items-center gap-2 text-sm font-semibold text-slate-500 transition hover:text-slate-700"
+              >
+                <ChevronRight
+                  className={`h-4 w-4 transition-transform ${finishedOpen ? 'rotate-90' : ''}`}
+                  aria-hidden="true"
                 />
+                已經上完（{finished.length}）
+              </button>
+              {finishedOpen && (
+                <ul className="mt-2 divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/80">
+                  {finished.map(renderRow)}
+                </ul>
               )}
-            </li>
-            );
-          })}
-        </ul>
+            </section>
+          )}
+        </div>
       )}
       </div>
     </>
@@ -839,7 +901,7 @@ function RollCall({
 
   if (loading) {
     return (
-      <p className="mt-4 flex items-center gap-2 border-t border-slate-100 pt-4 text-sm text-slate-600">
+      <p className="flex items-center gap-2 px-4 py-4 text-sm text-slate-600">
         <Spinner />
         正在讀取名單…
       </p>
@@ -848,7 +910,7 @@ function RollCall({
 
   if (entries.length === 0) {
     return (
-      <p className="mt-4 border-t border-slate-100 pt-4 text-sm text-slate-600">
+      <p className="px-4 py-4 text-sm text-slate-600">
         這場比賽還沒有已錄取的孩子。要先在比賽管理把報名狀態改成「已錄取」，
         名單才會出現在這裡。
       </p>
@@ -911,7 +973,7 @@ function RollCall({
   }
 
   return (
-    <div className="mt-4 space-y-4 border-t border-slate-100 pt-4">
+    <div className="space-y-4 px-4 py-4">
       <div className="flex flex-wrap gap-2 text-xs font-medium">
         <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-slate-700">
           錄取 {entries.length} 人
