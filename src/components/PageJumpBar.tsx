@@ -29,7 +29,7 @@ export default function PageJumpBar({ targets }: { targets: JumpTarget[] }) {
   return (
     <nav
       aria-label="快速跳到"
-      className="sticky top-0 z-20 -mx-4 border-b border-slate-200/70 bg-paper/95 px-4 py-2 backdrop-blur"
+      className="sticky top-0 z-20 -mx-4 mb-4 border-b border-slate-200/70 bg-paper/95 px-4 py-2 backdrop-blur"
     >
       {/* 手機上放不下就橫著捲，不換行也不藏起來 */}
       <ul className="flex gap-2 overflow-x-auto">
@@ -38,7 +38,7 @@ export default function PageJumpBar({ targets }: { targets: JumpTarget[] }) {
             <button
               type="button"
               onClick={() => jump(target.id)}
-              className="inline-flex min-h-[2.25rem] items-center gap-1.5 rounded-[1rem_0.8rem_1.05rem_0.85rem] border-2 border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 transition hover:border-brand-300 hover:text-brand-700"
+              className="inline-flex min-h-[2.75rem] items-center gap-1.5 rounded-[1rem_0.8rem_1.05rem_0.85rem] border-2 border-slate-200 bg-white px-3.5 py-1.5 text-sm text-slate-700 transition hover:border-brand-300 hover:text-brand-700 sm:min-h-[2.25rem] sm:px-3"
             >
               {target.label}
               <span className="tabular-nums text-xs text-slate-400">{target.count}</span>
