@@ -154,7 +154,9 @@ function Sidebar({
       <nav className="flex-1 space-y-5 p-3">
         {NAV_GROUPS.map((group) => (
           <div key={group.title}>
-            <p className="px-3 pb-1.5 text-xs font-semibold tracking-wider text-slate-500">
+            {/* slate-400 而不是更暗的 slate-500：12 像素的字在 slate-900
+                底上，slate-500 只有 3.8 的對比，過不了 WCAG AA 的 4.5 */}
+            <p className="px-3 pb-1.5 text-xs font-semibold tracking-wider text-slate-400">
               {group.title}
             </p>
             <div className="space-y-1">
