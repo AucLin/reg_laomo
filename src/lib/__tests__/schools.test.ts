@@ -55,7 +55,9 @@ describe('searchSchools', () => {
 
   it('關鍵字以模糊比對搜尋校名', async () => {
     await searchSchools({ level: 'elementary', keyword: '中正', cities: [] });
-    expect(builder.ilike).toHaveBeenCalledWith('name', '%中正%');
+    // 比對的是正規化過的 search_name，不是 name —— 家長打的字也會先過
+    // normalizeSchoolKeyword()，兩端規則要一致才對得上
+    expect(builder.ilike).toHaveBeenCalledWith('search_name', '%中正%');
   });
 
   it('關鍵字留空時不加校名條件，讓使用者可以先瀏覽', async () => {

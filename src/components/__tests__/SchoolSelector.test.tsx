@@ -46,19 +46,22 @@ describe('SchoolSelector', () => {
   */
   it('縣市選項預設收合，只顯示目前範圍', () => {
     render(<SchoolSelector value={emptySelection} onChange={vi.fn()} />);
-    expect(screen.queryByLabelText('桃園市')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('新竹市')).not.toBeInTheDocument();
     // 收合也要看得到範圍，否則搜不到學校時家長不知道是縣市擋掉的
-    expect(screen.getByText('新北市、臺北市')).toBeInTheDocument();
+    expect(screen.getByText('臺北市、新北市、基隆市、桃園市')).toBeInTheDocument();
   });
 
-  it('縣市預設勾選雙北', async () => {
+  it('縣市預設勾選北部四個', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<SchoolSelector value={emptySelection} onChange={vi.fn()} />);
 
     await user.click(screen.getByRole('button', { name: '調整' }));
     expect(screen.getByLabelText('新北市')).toBeChecked();
     expect(screen.getByLabelText('臺北市')).toBeChecked();
-    expect(screen.getByLabelText('桃園市')).not.toBeChecked();
+    expect(screen.getByLabelText('基隆市')).toBeChecked();
+    expect(screen.getByLabelText('桃園市')).toBeChecked();
+    // 招生範圍是北部，中南部不預設勾
+    expect(screen.getByLabelText('臺中市')).not.toBeChecked();
   });
 
   it('三種學校級別都可選', () => {
@@ -281,8 +284,10 @@ describe('SchoolSelector', () => {
     render(<SchoolSelector value={emptySelection} onChange={vi.fn()} />);
 
     await user.click(screen.getByRole('button', { name: '調整' }));
-    await user.click(screen.getByLabelText('新北市'));
-    await user.click(screen.getByLabelText('臺北市'));
+    // 預設勾的是北部四個，全部取消才等於不限縣市
+    for (const city of ['臺北市', '新北市', '基隆市', '桃園市']) {
+      await user.click(screen.getByLabelText(city));
+    }
     await user.type(screen.getByLabelText('搜尋學校名稱'), '中正');
     vi.advanceTimersByTime(250);
 
@@ -298,8 +303,9 @@ describe('SchoolSelector', () => {
     render(<SchoolSelector value={emptySelection} onChange={vi.fn()} />);
 
     await user.click(screen.getByRole('button', { name: '調整' }));
-    await user.click(screen.getByLabelText('新北市'));
-    await user.click(screen.getByLabelText('臺北市'));
+    for (const city of ['臺北市', '新北市', '基隆市', '桃園市']) {
+      await user.click(screen.getByLabelText(city));
+    }
     await user.click(screen.getByRole('button', { name: '收合' }));
 
     // 空白一片會讓家長以為是壞掉，要明確講出「全國」

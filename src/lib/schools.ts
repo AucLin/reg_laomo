@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { normalizeSchoolKeyword } from './schoolKeyword';
 import type { School, SchoolLevel } from './types';
 
 export const SEARCH_LIMIT = 20;
@@ -20,11 +21,17 @@ export async function searchSchools(query: SchoolQuery): Promise<School[]> {
     request = request.in('city', query.cities);
   }
 
-  const keyword = query.keyword.trim();
+  const keyword = normalizeSchoolKeyword(query.keyword);
   if (keyword !== '') {
-    // ILIKE 前後都加萬用字元，讓家長打「中正」也找得到「臺北市立中正國中」。
-    // 這種查詢靠 schools_name_trgm_idx 三連字元索引才不會全表掃描。
-    request = request.ilike('name', `%${keyword}%`);
+    /*
+      比對 search_name 而不是 name：那是正規化過的欄位（臺→台、去空白），
+      配上家長輸入這端的 normalizeSchoolKeyword()，「台北市立光復國小」
+      才找得到名錄裡的「市立光復國小」。
+
+      ILIKE 前後都加萬用字元，讓家長打「中正」也找得到「市立中正國中」。
+      這種查詢靠 schools_search_name_trgm_idx 三連字元索引才不會全表掃描。
+    */
+    request = request.ilike('search_name', `%${keyword}%`);
   }
 
   const { data, error } = await request.order('name').limit(SEARCH_LIMIT);
@@ -54,7 +61,7 @@ export const OTHER_LEVEL_HINT_LIMIT = 3;
  * 的國小部要走自由填寫。
  */
 export async function searchOtherLevels(query: SchoolQuery): Promise<School[]> {
-  const keyword = query.keyword.trim();
+  const keyword = normalizeSchoolKeyword(query.keyword);
   // 家長還沒開始打字時跳出「其他級別有這些學校」毫無意義，也白費一次查詢
   if (keyword === '') return [];
 
@@ -62,7 +69,7 @@ export async function searchOtherLevels(query: SchoolQuery): Promise<School[]> {
     .from('schools')
     .select('id, code, name, level, city')
     .neq('level', query.level)
-    .ilike('name', `%${keyword}%`);
+    .ilike('search_name', `%${keyword}%`);
 
   // 沿用家長設定的縣市範圍。範圍不一致的話，畫面會出現「你的搜尋範圍
   // 找不到，但別的縣市有」這種更難理解的提示。

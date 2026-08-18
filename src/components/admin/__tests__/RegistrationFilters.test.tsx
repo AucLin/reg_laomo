@@ -5,10 +5,10 @@ import RegistrationFilters from '../RegistrationFilters';
 import { EMPTY_FILTERS } from '../../../lib/adminRegistrations';
 
 describe('RegistrationFilters', () => {
-  it('縣市預設篩在雙北時明確告知使用者', () => {
+  it('縣市預設篩在北部時明確告知使用者', () => {
     render(<RegistrationFilters value={EMPTY_FILTERS} onChange={vi.fn()} />);
     expect(
-      screen.getByText('目前依縣市篩選：新北市、臺北市')
+      screen.getByText('目前依縣市篩選：臺北市、新北市、基隆市、桃園市')
     ).toBeInTheDocument();
   });
 

@@ -64,10 +64,10 @@ describe('listRegistrations', () => {
   // NULL。SQL 的 IN 對 NULL 求值為 NULL、視同不成立，該列會被整批濾掉 ——
   // 而那正是規格要求「待人工確認學校」要醒目標記的一批，最不該消失。
   // 用 OR 明確放行 school_city IS NULL，才能讓這批報名留在篩選結果裡。
-  it('預設篩選雙北，且放行 school_city 為 NULL 的報名（找不到我的學校／學校已停用）', async () => {
+  it('預設篩選北部，且放行 school_city 為 NULL 的報名（找不到我的學校／學校已停用）', async () => {
     await listRegistrations(EMPTY_FILTERS, 0);
     expect(builder.or).toHaveBeenCalledWith(
-      'school_city.in.("新北市","臺北市"),school_city.is.null'
+      'school_city.in.("臺北市","新北市","基隆市","桃園市"),school_city.is.null'
     );
   });
 

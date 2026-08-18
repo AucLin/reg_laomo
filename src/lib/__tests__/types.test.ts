@@ -32,8 +32,16 @@ describe('getGradeOptions', () => {
 });
 
 describe('DEFAULT_CITIES', () => {
-  it('預設縣市為雙北，且使用正體的臺北市', () => {
-    expect(DEFAULT_CITIES).toEqual(['新北市', '臺北市']);
+  it('預設縣市涵蓋北部，且使用正體的臺北市', () => {
+    expect(DEFAULT_CITIES).toEqual(['臺北市', '新北市', '基隆市', '桃園市']);
+  });
+
+  /*
+    這個常數是拿去跟資料庫的 city 欄位比對的，名錄一律寫「臺」。
+    寫成「台北市」會篩出零筆，而且是靜悄悄的零筆。
+  */
+  it('不可寫成台北市，否則篩不到任何學校', () => {
+    expect(DEFAULT_CITIES.every((city) => !city.includes('台'))).toBe(true);
   });
 });
 
