@@ -175,6 +175,37 @@ describe('TrainingSchedule', () => {
     );
   });
 
+  /*
+    家長最常問的是「我挑完了嗎」。這個數字就是答案，一個都沒挑時
+    講得更直白，因為那通常代表他還沒動手，不是他決定都不來。
+  */
+  it('數出自己挑了幾個時段', async () => {
+    setup({
+      sessions: [FUTURE_SESSION, { ...FUTURE_SESSION, id: 'session-2' }],
+      marks: [makeMark('signed_up'), makeMark('signed_up', { id: 'att-2', session_id: 'session-2' })],
+    });
+    render(<TrainingSchedule />);
+
+    expect(await screen.findByText('已挑 2 個時段')).toBeInTheDocument();
+  });
+
+  it('一個都沒挑時說得直白一點', async () => {
+    setup();
+    render(<TrainingSchedule />);
+
+    expect(await screen.findByText('還沒挑任何時段')).toBeInTheDocument();
+  });
+
+  /*
+    點名結果不算「挑了」—— 那是上課當天的事實，不是家長還能改的選擇。
+  */
+  it('點過名的場次不算進已挑的時段', async () => {
+    setup({ marks: [makeMark('present')] });
+    render(<TrainingSchedule />);
+
+    expect(await screen.findByText('還沒挑任何時段')).toBeInTheDocument();
+  });
+
   it('沒排集訓時整區不顯示，不留一塊空白', async () => {
     setup({ sessions: [] });
     const { container } = render(<TrainingSchedule />);

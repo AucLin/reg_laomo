@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react';
-import { CalendarDays, Check } from 'lucide-react';
 import Spinner from './Spinner';
-import { DashedRule, Squiggle } from './doodles';
+import {
+  CalendarDoodle,
+  CircleScribble,
+  DashedRule,
+  HandCheck,
+  NoteFrame,
+  Squiggle,
+} from './doodles';
 import { listMyEntries, listOpenContests } from '../lib/contests';
 import {
   cancelTrainingSignup,
@@ -19,13 +25,13 @@ import {
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
 
-/** 9/6（六）。年份省掉 —— 集訓都在眼前這幾週，寫出來只是雜訊 */
-function formatSessionDate(date: string): string {
+/** 拆成 9/6 與「六」兩截：日期塊上下兩行分開排 */
+function splitDate(date: string): { md: string; weekday: string } {
   const [, month, day] = date.split('-').map(Number);
   // 用 UTC 建構再讀 UTC 的星期：直接 new Date('2026-09-06') 在台灣時區
   // 會被解讀成當地時間的午夜，某些日期會整個差一天
   const weekday = WEEKDAYS[new Date(`${date}T00:00:00Z`).getUTCDay()];
-  return `${month}/${day}（${weekday}）`;
+  return { md: `${month}/${day}`, weekday };
 }
 
 /*
@@ -34,6 +40,10 @@ function formatSessionDate(date: string): string {
   管理員把時段排出來，家長從裡面挑孩子要上的那幾場 —— 挑了才算數，
   沒挑就是不來。這也是為什麼畫面上沒有「請假」：不來就不要挑，
   挑了又不來就取消。
+
+  版面照日曆的樣子做：每一場左邊一塊日期，挑好的那幾天用筆圈起來。
+  家長要回答的問題是「這幾天我家小孩哪幾天能來」，翻日曆正是他們
+  本來就在做的事。
 
   資料是三份拼起來的：場次（列級權限已經限縮到自己孩子有份的比賽）、
   自己孩子的報名（誰是誰）、挑選紀錄（沒有列就代表沒挑）。三份都很小
@@ -119,120 +129,194 @@ export default function TrainingSchedule() {
 
   return (
     <section className="mt-12">
-      <div className="inline-block">
-        <h2 className="flex items-center gap-2 text-2xl font-bold text-slate-900">
-          <CalendarDays className="h-6 w-6 text-brand-600" aria-hidden="true" />
-          集訓時間
-        </h2>
-        <Squiggle className="mt-1 text-amber-400" />
+      <div className="flex items-start gap-3 sm:gap-4">
+        <CalendarDoodle className="h-12 w-12 shrink-0 text-brand-600 sm:h-16 sm:w-16" />
+        <div className="min-w-0">
+          <div className="inline-block">
+            <h2 className="text-2xl font-bold text-slate-900">集訓時間</h2>
+            <Squiggle className="mt-1 text-amber-400" />
+          </div>
+          <p className="mt-2 text-sm text-slate-600">
+            請挑出孩子要來的時段，挑了我們才會準備位子。要改隨時都可以，課開始後就
+            改不了，請直接打電話給我們。
+          </p>
+        </div>
       </div>
-      <p className="mt-2 text-sm text-slate-600">
-        請挑出孩子要來的時段，挑了我們才會準備位子。要改隨時都可以，課開始後就
-        改不了，請直接打電話給我們。
-      </p>
 
       {error && (
-        <p role="alert" className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
+        <p
+          role="alert"
+          className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-100"
+        >
           {error}
         </p>
       )}
 
       <div className="mt-6 space-y-6">
-        {byContest.map(({ contest, rows, kids }) => (
-          <div
-            key={contest.id}
-            className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200/80 sm:p-6"
-          >
-            <h3 className="font-semibold text-slate-900">{contest.title}</h3>
-            <DashedRule className="my-4 text-slate-300" />
+        {byContest.map(({ contest, rows, kids }) => {
+          /*
+            自己挑了幾個時段。家長最常問的是「我挑完了嗎」，這個數字
+            就是答案 —— 一個都沒挑時說得更直白一點。
+          */
+          const pickedCount = rows.reduce(
+            (total, session) =>
+              total +
+              kids.filter((kid) =>
+                marks.some(
+                  (m) =>
+                    m.session_id === session.id &&
+                    m.entry_id === kid.id &&
+                    m.status === 'signed_up'
+                )
+              ).length,
+            0
+          );
 
-            <ul className="space-y-4">
-              {rows.map((session) => {
-                const past =
-                  new Date(`${session.session_date}T${session.start_time}`) < new Date();
+          return (
+            <div
+              key={contest.id}
+              className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200/80 sm:p-6"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="font-semibold text-slate-900">{contest.title}</h3>
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-medium ${
+                    pickedCount > 0
+                      ? 'bg-brand-50 text-brand-700'
+                      : 'bg-amber-50 text-amber-800'
+                  }`}
+                >
+                  {pickedCount > 0 ? `已挑 ${pickedCount} 個時段` : '還沒挑任何時段'}
+                </span>
+              </div>
+              <DashedRule className="my-4 text-slate-300" />
 
-                return (
-                  <li key={session.id} className={past ? 'opacity-60' : ''}>
-                    <p className="font-medium text-slate-800">
-                      {formatSessionDate(session.session_date)}
-                      {formatTime(session.start_time)}–{formatTime(session.end_time)}
-                    </p>
-                    {session.location && (
-                      <p className="text-sm text-slate-600">{session.location}</p>
-                    )}
-                    {session.note && (
-                      <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-600">
-                        {session.note}
-                      </p>
-                    )}
+              <ul className="space-y-3">
+                {rows.map((session) => {
+                  const past =
+                    new Date(`${session.session_date}T${session.start_time}`) < new Date();
+                  const { md, weekday } = splitDate(session.session_date);
+                  // 這一天我家有人要去，日期就圈起來
+                  const anyJoined = kids.some((kid) =>
+                    marks.some(
+                      (m) =>
+                        m.session_id === session.id &&
+                        m.entry_id === kid.id &&
+                        m.status === 'signed_up'
+                    )
+                  );
 
-                    <ul className="mt-2 space-y-2">
-                      {kids.map((kid) => {
-                        const key = `${session.id}:${kid.id}`;
-                        const mark = marks.find(
-                          (m) => m.session_id === session.id && m.entry_id === kid.id
-                        );
-                        const joined = mark?.status === 'signed_up';
-                        const busy = busyKey === key;
-
-                        return (
-                          <li
-                            key={kid.id}
-                            className={`flex flex-wrap items-center gap-2 rounded-lg px-3 py-2 text-sm ${
-                              joined ? 'bg-brand-50' : 'bg-slate-50'
-                            }`}
-                          >
-                            <span className="font-medium text-slate-800">
-                              {kid.student_name}
+                  return (
+                    <li
+                      key={session.id}
+                      className={`rounded-2xl p-3 sm:p-4 ${
+                        past ? 'bg-slate-50 opacity-70' : anyJoined ? 'bg-brand-50/60' : 'bg-slate-50'
+                      }`}
+                    >
+                      <div className="flex flex-col gap-3 sm:flex-row sm:gap-5">
+                        {/* 日期塊。手機橫著擺，桌機立起來放左邊 */}
+                        <div className="flex shrink-0 items-center gap-3 sm:w-20 sm:flex-col sm:gap-1.5">
+                          <div className="relative flex h-16 w-16 shrink-0 flex-col items-center justify-center">
+                            {anyJoined ? (
+                              <span className="absolute -inset-1">
+                                <CircleScribble className="text-brand-500" />
+                              </span>
+                            ) : (
+                              <span className="absolute inset-0">
+                                <NoteFrame
+                                  className={past ? 'text-slate-300' : 'text-slate-400'}
+                                />
+                              </span>
+                            )}
+                            <span className="relative text-base font-bold text-slate-900">
+                              {md}
                             </span>
+                            <span className="relative text-[11px] text-slate-600">
+                              （{weekday}）
+                            </span>
+                          </div>
+                          <span className="tabular-nums text-sm text-slate-600 sm:text-center sm:text-xs">
+                            {formatTime(session.start_time)}–{formatTime(session.end_time)}
+                          </span>
+                        </div>
 
-                            {joined && (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-brand-100 px-2.5 py-0.5 text-xs font-medium text-brand-800">
-                                <Check className="h-3 w-3" aria-hidden="true" />
-                                會來
-                              </span>
-                            )}
-                            {/* 點名結果是上課當天的事實，家長只能看 */}
-                            {mark?.status === 'present' && (
-                              <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800">
-                                已到
-                              </span>
-                            )}
-                            {mark?.status === 'absent' && (
-                              <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">
-                                未到
-                              </span>
-                            )}
+                        <ul className="grid min-w-0 flex-1 gap-2 sm:grid-cols-2">
+                          {kids.map((kid) => {
+                            const key = `${session.id}:${kid.id}`;
+                            const mark = marks.find(
+                              (m) => m.session_id === session.id && m.entry_id === kid.id
+                            );
+                            const joined = mark?.status === 'signed_up';
+                            const busy = busyKey === key;
 
-                            {/* 課開始後不給改：資料庫也擋著，這裡先收起來，
-                                免得按了才被拒絕 */}
-                            {!past && (
-                              <span className="ml-auto flex items-center gap-2">
-                                {busy && <Spinner className="h-4 w-4 text-slate-500" />}
-                                <button
-                                  type="button"
-                                  onClick={() => toggle(session.id, kid.id, joined)}
-                                  disabled={busy}
-                                  className={
-                                    joined
-                                      ? 'rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-600 transition hover:bg-slate-50 disabled:opacity-60'
-                                      : 'rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-brand-700 disabled:opacity-60'
-                                  }
-                                >
-                                  {joined ? '取消' : '這場要來'}
-                                </button>
-                              </span>
-                            )}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))}
+                            return (
+                              <li
+                                key={kid.id}
+                                className={`flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl bg-white px-3 py-2 text-sm ring-1 ${
+                                  joined ? 'ring-brand-200' : 'ring-slate-200'
+                                }`}
+                              >
+                                <span className="font-medium text-slate-800">
+                                  {kid.student_name}
+                                </span>
+
+                                {joined && (
+                                  <span className="inline-flex items-center gap-1 text-xs font-medium text-brand-700">
+                                    <HandCheck className="h-3.5 w-3.5" />
+                                    會來
+                                  </span>
+                                )}
+                                {/* 點名結果是上課當天的事實，家長只能看 */}
+                                {mark?.status === 'present' && (
+                                  <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800">
+                                    已到
+                                  </span>
+                                )}
+                                {mark?.status === 'absent' && (
+                                  <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">
+                                    未到
+                                  </span>
+                                )}
+
+                                {/* 課開始後不給改：資料庫也擋著，這裡先收起來，
+                                    免得按了才被拒絕 */}
+                                {!past && (
+                                  <span className="ml-auto flex items-center gap-2">
+                                    {busy && <Spinner className="h-4 w-4 text-slate-500" />}
+                                    <button
+                                      type="button"
+                                      onClick={() => toggle(session.id, kid.id, joined)}
+                                      disabled={busy}
+                                      className={
+                                        // 手機上是家長真的要按的東西，給到 44 高；
+                                        // 桌機用滑鼠點，維持原本的密度
+                                        joined
+                                          ? 'rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-600 transition hover:bg-slate-50 disabled:opacity-60 sm:px-3 sm:py-1.5'
+                                          : 'rounded-lg bg-brand-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-brand-700 disabled:opacity-60 sm:px-3 sm:py-1.5'
+                                      }
+                                    >
+                                      {joined ? '取消' : '這場要來'}
+                                    </button>
+                                  </span>
+                                )}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+
+                      {session.note && (
+                        <p className="mt-3 whitespace-pre-wrap break-words rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-900 ring-1 ring-amber-100">
+                          {session.note}
+                        </p>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          );
+        })}
       </div>
     </section>
   );

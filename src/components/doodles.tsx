@@ -233,6 +233,116 @@ export function ClipboardDoodle(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+/** 圈了日子的日曆。集訓時間表的標題旁用 */
+export function CalendarDoodle(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 140 120" aria-hidden="true" {...props}>
+      <g {...STROKE}>
+        {/* 掛環 */}
+        <path d="M42 14 L 42 26" />
+        <path d="M98 14 L 98 26" />
+
+        {/* 本體，四邊都畫歪一點 */}
+        <path d="M18 24 C 50 21, 92 22, 122 24 C 124 50, 123 88, 122 106 C 90 109, 48 108, 18 106 C 16 80, 17 42, 18 24 Z" />
+        {/* 月份那一條 */}
+        <path d="M18 42 C 50 39, 92 40, 122 42" />
+
+        {/* 日子。用短線畫，不畫數字 —— 縮到 40px 時數字只會糊成一團 */}
+        <path d="M34 58 L 44 58" />
+        <path d="M62 58 L 72 58" />
+        <path d="M90 58 L 100 58" />
+        <path d="M34 76 L 44 76" />
+        <path d="M90 76 L 100 76" />
+        <path d="M34 92 L 44 92" />
+        <path d="M62 92 L 72 92" />
+
+        {/* 圈起來的那一天，就是家長挑的日子 */}
+        <path
+          d="M56 68 C 68 64, 82 68, 82 76 C 82 84, 68 88, 60 84 C 53 81, 52 71, 60 67"
+          stroke={ACCENT}
+        />
+        <path d="M62 76 L 66 81 L 75 71" stroke={ACCENT} />
+
+        {/* 火花 */}
+        <path d="M128 60 L 128 70" stroke={ACCENT} />
+        <path d="M123 65 L 133 65" stroke={ACCENT} />
+        <path d="M10 84 L 10 92" stroke={ACCENT} />
+        <path d="M6 88 L 14 88" stroke={ACCENT} />
+      </g>
+    </svg>
+  );
+}
+
+/*
+  手繪的方框，鋪在日期塊底下當外框。
+
+  preserveAspectRatio="none" 讓它跟著容器變形，再用 non-scaling-stroke
+  把線寬釘住 —— 不然拉成長方形時，直邊會比橫邊粗一倍。
+*/
+export function NoteFrame({ className = '' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 100 100"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+      className={`h-full w-full ${className}`}
+    >
+      {/* 收尾多畫一小段回頭，像筆沒收好 */}
+      <path
+        d="M6 8 C 34 5, 68 6, 94 8 C 96 34, 95 68, 94 92 C 66 95, 32 94, 6 92 C 4 66, 5 32, 6 8 C 10 7, 14 7, 18 7"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2.2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
+  );
+}
+
+/*
+  用筆圈起來的橢圓，圈兩道 —— 一道太整齊，看起來像畫出來的框而不是圈的。
+  蓋在挑好的日子上。
+*/
+export function CircleScribble({ className = '' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 100 100"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+      className={`h-full w-full ${className}`}
+    >
+      <g
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2.6}
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+      >
+        <path d="M52 6 C 82 8, 96 28, 94 52 C 92 78, 72 94, 48 94 C 22 94, 6 76, 6 50 C 6 24, 24 8, 50 6" />
+        <path d="M58 10 C 84 14, 94 32, 92 54 C 90 76, 70 90, 48 90" opacity="0.5" />
+      </g>
+    </svg>
+  );
+}
+
+/** 手畫的打勾。挑好的時段旁邊用 */
+export function HandCheck({ className = '' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={`h-4 w-4 ${className}`}>
+      <path
+        d="M4 13 C 6 15, 8 18, 10 20 C 13 14, 17 7, 21 3"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 /*
   卡片裡的分隔線，畫成一排手點上去的短虛線。
   一樣用 preserveAspectRatio="none" 跟著容器拉寬：橫向拉伸會把虛線的
