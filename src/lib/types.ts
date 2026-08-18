@@ -311,12 +311,17 @@ export interface TrainingSession {
   updated_at: string;
 }
 
-export type AttendanceStatus = 'present' | 'absent' | 'excused';
+/*
+  沒有列代表這個孩子沒挑這個時段，也就是不會來 —— 沒挑不是一種狀態，
+  是沒有紀錄。signed_up 是家長挑了、還沒上到課；present／absent 是
+  上課當天管理員點的名。
+*/
+export type AttendanceStatus = 'signed_up' | 'present' | 'absent';
 
 export const ATTENDANCE_LABELS: Record<AttendanceStatus, string> = {
+  signed_up: '會來',
   present: '已到',
   absent: '未到',
-  excused: '已請假',
 };
 
 export interface TrainingAttendance {
@@ -324,7 +329,6 @@ export interface TrainingAttendance {
   session_id: string;
   entry_id: string;
   status: AttendanceStatus;
-  leave_reason: string | null;
   created_at: string;
   updated_at: string;
 }

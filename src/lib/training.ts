@@ -10,22 +10,23 @@ export interface NewTrainingSession {
 }
 
 /*
-  request_leave() 用 RAISE EXCEPTION 丟出寫給家長看的中文訊息，這裡逐字
-  列出來當白名單。不在清單內的錯誤（連線失敗、權限問題）一律換成籠統的
-  說法，不把原始的資料庫訊息露出去。
+  signup_training() 與 cancel_training_signup() 用 RAISE EXCEPTION 丟出
+  寫給家長看的中文訊息，這裡逐字列出來當白名單。不在清單內的錯誤
+  （連線失敗、權限問題）一律換成籠統的說法，不把原始的資料庫訊息露出去。
 */
-const KNOWN_LEAVE_ERRORS = [
+const KNOWN_SIGNUP_ERRORS = [
   '找不到這個集訓場次',
   '這不是您的孩子',
   '這個孩子沒有報名這場比賽',
+  '這個孩子還沒錄取這場比賽',
   '這個場次已經開始，請直接聯繫我們',
   '這個場次已經點過名，請直接聯繫我們',
-  '這筆請假已經無法取消，請直接聯繫我們',
+  '這個時段已經不能取消，請直接聯繫我們',
 ];
 
 function toParentFacingError(message: string): string {
   const cleaned = message.replace(/^.*?:\s*/s, '').trim();
-  return KNOWN_LEAVE_ERRORS.includes(cleaned) ? cleaned : '操作失敗，請稍後再試';
+  return KNOWN_SIGNUP_ERRORS.includes(cleaned) ? cleaned : '操作失敗，請稍後再試';
 }
 
 /** 某場比賽的集訓場次，依日期時間排序 */
@@ -123,7 +124,7 @@ export async function deleteSession(id: string): Promise<{ error: string | null 
   return { error: null };
 }
 
-/** 某個場次的出缺席。沒有列代表還沒點名也沒請假 */
+/** 某個場次的名單。沒有列代表這個孩子沒挑這個時段，也就是不會來 */
 export async function listAttendance(
   sessionId: string
 ): Promise<TrainingAttendance[]> {
@@ -139,7 +140,29 @@ export async function listAttendance(
   return (data ?? []) as TrainingAttendance[];
 }
 
-/** 家長端：自己孩子的全部出缺席，一次取回後在畫面上對照場次 */
+/**
+ * 管理員端：一次取回多個場次的名單，用來在場次列表上顯示「幾人會來」。
+ *
+ * 場次數量是個位數，一次 .in() 撈完就好，不必每張卡片各查一次。
+ */
+export async function listAttendanceForSessions(
+  sessionIds: string[]
+): Promise<TrainingAttendance[]> {
+  if (sessionIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from('training_attendance')
+    .select('*')
+    .in('session_id', sessionIds);
+
+  if (error) {
+    console.error('讀取名單失敗：', error.message);
+    return [];
+  }
+  return (data ?? []) as TrainingAttendance[];
+}
+
+/** 家長端：自己孩子挑過的全部時段，一次取回後在畫面上對照場次 */
 export async function listMyAttendance(): Promise<TrainingAttendance[]> {
   const { data, error } = await supabase
     .from('training_attendance')
@@ -159,12 +182,12 @@ export async function listMyAttendance(): Promise<TrainingAttendance[]> {
 export async function markAttendance(
   sessionId: string,
   entryId: string,
-  status: Exclude<AttendanceStatus, 'excused'>
+  status: Exclude<AttendanceStatus, 'signed_up'>
 ): Promise<{ error: string | null }> {
   const { data, error } = await supabase
     .from('training_attendance')
     .upsert(
-      { session_id: sessionId, entry_id: entryId, status, leave_reason: null },
+      { session_id: sessionId, entry_id: entryId, status },
       { onConflict: 'session_id,entry_id' }
     )
     .select('id');
@@ -179,7 +202,12 @@ export async function markAttendance(
   return { error: null };
 }
 
-/** 清掉點名結果，回到「還沒點名」 */
+/**
+ * 清掉這一列，回到「沒挑這個時段」。
+ *
+ * 管理員用這個把點錯的名收回來 —— 收回之後那個孩子就不在名單上了，
+ * 要讓他回到名單得由家長重新挑，或管理員直接標「已到」。
+ */
 export async function clearAttendance(
   sessionId: string,
   entryId: string
@@ -198,38 +226,38 @@ export async function clearAttendance(
 }
 
 /**
- * 家長請假。所有檢查（是不是自己的孩子、場次有沒有開始、有沒有被點過名）
- * 都在資料庫的 request_leave() 裡完成，前端繞不過去。
+ * 家長挑一個時段。所有檢查（是不是自己的孩子、有沒有錄取、場次有沒有
+ * 開始、有沒有被點過名）都在資料庫的 signup_training() 裡完成，
+ * 前端繞不過去。
  */
-export async function requestLeave(
+export async function signupTraining(
   sessionId: string,
-  entryId: string,
-  reason: string
+  entryId: string
 ): Promise<{ error: string | null }> {
-  const { error } = await supabase.rpc('request_leave', {
+  const { error } = await supabase.rpc('signup_training', {
     p_session_id: sessionId,
     p_entry_id: entryId,
-    p_reason: reason,
   });
 
   if (error) {
-    console.error('請假失敗：', error.message);
+    console.error('挑選時段失敗：', error.message);
     return { error: toParentFacingError(error.message) };
   }
   return { error: null };
 }
 
-export async function cancelLeave(
+/** 家長改變主意，取消挑好的時段。點過名的動不了 */
+export async function cancelTrainingSignup(
   sessionId: string,
   entryId: string
 ): Promise<{ error: string | null }> {
-  const { error } = await supabase.rpc('cancel_leave', {
+  const { error } = await supabase.rpc('cancel_training_signup', {
     p_session_id: sessionId,
     p_entry_id: entryId,
   });
 
   if (error) {
-    console.error('取消請假失敗：', error.message);
+    console.error('取消時段失敗：', error.message);
     return { error: toParentFacingError(error.message) };
   }
   return { error: null };

@@ -9,6 +9,7 @@ import {
   createSession,
   deleteSession,
   listAttendance,
+  listAttendanceForSessions,
   listSessions,
   markAttendance,
   updateSession,
@@ -35,6 +36,18 @@ const EMPTY_FORM: SessionForm = {
   note: '',
 };
 
+/** 把場次清單換算成「每一場幾個孩子挑了」 */
+async function countSignups(
+  sessions: TrainingSession[]
+): Promise<Map<string, number>> {
+  const rows = await listAttendanceForSessions(sessions.map((s) => s.id));
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    counts.set(row.session_id, (counts.get(row.session_id) ?? 0) + 1);
+  }
+  return counts;
+}
+
 export default function AdminTrainingPage() {
   const [contests, setContests] = useState<Contest[]>([]);
   const [contestId, setContestId] = useState('');
@@ -53,6 +66,12 @@ export default function AdminTrainingPage() {
   // 展開哪一場的點名畫面
   const [rollCallFor, setRollCallFor] = useState<string | null>(null);
 
+  /*
+    每一場有幾個孩子挑了，鍵是場次 id。老莫排完時段最想知道的就是這個
+    數字，不該為了看它一場一場點開。
+  */
+  const [signupCounts, setSignupCounts] = useState<Map<string, number>>(new Map());
+
   useEffect(() => {
     listAllContests()
       .then((rows) => {
@@ -70,9 +89,10 @@ export default function AdminTrainingPage() {
     }
     let active = true;
     setLoadingSessions(true);
-    listSessions(contestId).then((rows) => {
+    listSessions(contestId).then(async (rows) => {
       if (!active) return;
       setSessions(rows);
+      setSignupCounts(await countSignups(rows));
       setLoadingSessions(false);
     });
     return () => {
@@ -81,7 +101,13 @@ export default function AdminTrainingPage() {
   }, [contestId]);
 
   async function reloadSessions() {
-    setSessions(await listSessions(contestId));
+    const rows = await listSessions(contestId);
+    setSessions(rows);
+    setSignupCounts(await countSignups(rows));
+  }
+
+  async function reloadCounts() {
+    setSignupCounts(await countSignups(sessions));
   }
 
   const noteIme = useImeGuardedInput<HTMLTextAreaElement>((note) => patch({ note }));
@@ -347,9 +373,21 @@ export default function AdminTrainingPage() {
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0 flex-1 break-words">
-                  <h2 className="font-semibold text-slate-900">
-                    {session.session_date}　{formatTime(session.start_time)}–
-                    {formatTime(session.end_time)}
+                  <h2 className="flex flex-wrap items-center gap-2 font-semibold text-slate-900">
+                    <span>
+                      {session.session_date}　{formatTime(session.start_time)}–
+                      {formatTime(session.end_time)}
+                    </span>
+                    {/* 沒人挑也要把 0 寫出來，空白會被當成還沒載入 */}
+                    <span
+                      className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                        (signupCounts.get(session.id) ?? 0) > 0
+                          ? 'bg-brand-100 text-brand-800'
+                          : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      {signupCounts.get(session.id) ?? 0} 人會來
+                    </span>
                   </h2>
                   {session.location && (
                     <p className="mt-1 text-sm text-slate-600">{session.location}</p>
@@ -370,7 +408,7 @@ export default function AdminTrainingPage() {
                   }
                   className="rounded-lg border border-brand-500 px-4 py-2 text-sm font-medium text-brand-600 transition hover:bg-brand-50"
                 >
-                  {rollCallFor === session.id ? '收起點名' : '點名'}
+                  {rollCallFor === session.id ? '收起名單' : '看名單 / 點名'}
                 </button>
                 <button
                   type="button"
@@ -413,7 +451,11 @@ export default function AdminTrainingPage() {
               </div>
 
               {rollCallFor === session.id && (
-                <RollCall session={session} onError={setError} />
+                <RollCall
+                  session={session}
+                  onError={setError}
+                  onChanged={reloadCounts}
+                />
               )}
             </li>
           ))}
@@ -425,15 +467,23 @@ export default function AdminTrainingPage() {
 }
 
 /*
-  點名。名單取自這場比賽「已錄取」的報名 —— 待審核與已聯絡的還沒確定
-  要不要來，混進點名表只會讓人每次都要重新判斷誰該在場。
+  這一場的名單。
+
+  分成兩區：家長挑了這個時段的（會來），以及錄取了但沒挑這一場的。
+  第二區不是多餘的 —— 老莫要知道的不只「誰會來」，還有「誰整期都沒挑」，
+  那通常代表家長忘了挑，該打通電話。
+
+  名單取自這場比賽「已錄取」的報名。待審核與已聯絡的還沒確定要不要來，
+  混進來只會讓人每次都要重新判斷誰該在場。
 */
 function RollCall({
   session,
   onError,
+  onChanged,
 }: {
   session: TrainingSession;
   onError: (message: string) => void;
+  onChanged: () => void;
 }) {
   const [entries, setEntries] = useState<ContestEntry[]>([]);
   const [marks, setMarks] = useState<Map<string, TrainingAttendance>>(new Map());
@@ -458,6 +508,8 @@ function RollCall({
 
   async function refresh() {
     setMarks(new Map((await listAttendance(session.id)).map((i) => [i.entry_id, i])));
+    // 場次卡片上的「幾人會來」也要跟著變
+    onChanged();
   }
 
   async function mark(entryId: string, status: 'present' | 'absent') {
@@ -494,83 +546,120 @@ function RollCall({
     );
   }
 
-  const present = entries.filter((e) => marks.get(e.id)?.status === 'present').length;
-  const excused = entries.filter((e) => marks.get(e.id)?.status === 'excused').length;
+  // 有列就代表家長挑了這個時段（點過名的那幾列本來也是挑出來的）
+  const coming = entries.filter((entry) => marks.has(entry.id));
+  const notPicked = entries.filter((entry) => !marks.has(entry.id));
+  const present = coming.filter((e) => marks.get(e.id)?.status === 'present').length;
+
+  function renderActions(entry: ContestEntry) {
+    const mark_ = marks.get(entry.id);
+    const busy = busyEntryId === entry.id;
+
+    return (
+      <div className="ml-auto flex items-center gap-2">
+        {busy && <Spinner className="h-4 w-4 text-slate-500" />}
+        <button
+          type="button"
+          onClick={() => mark(entry.id, 'present')}
+          disabled={busy}
+          aria-pressed={mark_?.status === 'present'}
+          className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm transition disabled:opacity-60 ${
+            mark_?.status === 'present'
+              ? 'bg-emerald-600 font-medium text-white'
+              : 'border border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+          }`}
+        >
+          <Check className="h-4 w-4" aria-hidden="true" />
+          到
+        </button>
+        <button
+          type="button"
+          onClick={() => mark(entry.id, 'absent')}
+          disabled={busy}
+          aria-pressed={mark_?.status === 'absent'}
+          className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm transition disabled:opacity-60 ${
+            mark_?.status === 'absent'
+              ? 'bg-red-600 font-medium text-white'
+              : 'border border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+          }`}
+        >
+          <X className="h-4 w-4" aria-hidden="true" />
+          沒到
+        </button>
+        {mark_ && (
+          <button
+            type="button"
+            onClick={() => clear(entry.id)}
+            disabled={busy}
+            aria-label={`把 ${entry.student_name} 移出這個時段`}
+            className="rounded-lg p-1.5 text-slate-500 transition hover:bg-white disabled:opacity-60"
+          >
+            <Trash2 className="h-4 w-4" aria-hidden="true" />
+          </button>
+        )}
+      </div>
+    );
+  }
 
   return (
-    <div className="mt-4 border-t border-slate-100 pt-4">
+    <div className="mt-4 space-y-4 border-t border-slate-100 pt-4">
       <p className="text-sm text-slate-600">
-        共 {entries.length} 人，已到 {present} 人
-        {excused > 0 && `，請假 ${excused} 人`}
+        錄取 {entries.length} 人，這個時段 {coming.length} 人會來
+        {present > 0 && `，已到 ${present} 人`}
       </p>
 
-      <ul className="mt-3 space-y-2">
-        {entries.map((entry) => {
-          const mark_ = marks.get(entry.id);
-          const busy = busyEntryId === entry.id;
+      <section>
+        <h3 className="text-sm font-semibold text-slate-700">
+          會來（{coming.length}）
+        </h3>
+        {coming.length === 0 ? (
+          <p className="mt-1 text-sm text-slate-500">還沒有家長挑這個時段</p>
+        ) : (
+          <ul className="mt-2 space-y-2">
+            {coming.map((entry) => {
+              const mark_ = marks.get(entry.id);
 
-          return (
-            <li
-              key={entry.id}
-              className="flex flex-wrap items-center gap-3 rounded-lg bg-slate-50 px-3 py-2"
-            >
-              <span className="font-medium text-slate-800">{entry.student_name}</span>
-              <span className="text-sm text-slate-600">{formatGrade(entry.grade)}</span>
-
-              {/* 請假是家長事先按的，點名時要一眼看到，不必翻紀錄 */}
-              {mark_?.status === 'excused' && (
-                <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800">
-                  已請假
-                  {mark_.leave_reason && `：${mark_.leave_reason}`}
-                </span>
-              )}
-
-              <div className="ml-auto flex items-center gap-2">
-                {busy && <Spinner className="h-4 w-4 text-slate-500" />}
-                <button
-                  type="button"
-                  onClick={() => mark(entry.id, 'present')}
-                  disabled={busy}
-                  aria-pressed={mark_?.status === 'present'}
-                  className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm transition disabled:opacity-60 ${
-                    mark_?.status === 'present'
-                      ? 'bg-emerald-600 font-medium text-white'
-                      : 'border border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
-                  }`}
+              return (
+                <li
+                  key={entry.id}
+                  className="flex flex-wrap items-center gap-3 rounded-lg bg-slate-50 px-3 py-2"
                 >
-                  <Check className="h-4 w-4" aria-hidden="true" />
-                  到
-                </button>
-                <button
-                  type="button"
-                  onClick={() => mark(entry.id, 'absent')}
-                  disabled={busy}
-                  aria-pressed={mark_?.status === 'absent'}
-                  className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm transition disabled:opacity-60 ${
-                    mark_?.status === 'absent'
-                      ? 'bg-red-600 font-medium text-white'
-                      : 'border border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  <X className="h-4 w-4" aria-hidden="true" />
-                  沒到
-                </button>
-                {mark_ && (
-                  <button
-                    type="button"
-                    onClick={() => clear(entry.id)}
-                    disabled={busy}
-                    aria-label={`清除 ${entry.student_name} 的點名`}
-                    className="rounded-lg p-1.5 text-slate-500 transition hover:bg-white disabled:opacity-60"
-                  >
-                    <Trash2 className="h-4 w-4" aria-hidden="true" />
-                  </button>
-                )}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+                  <span className="font-medium text-slate-800">{entry.student_name}</span>
+                  <span className="text-sm text-slate-600">{formatGrade(entry.grade)}</span>
+                  {mark_?.status === 'signed_up' && (
+                    <span className="rounded-full bg-brand-100 px-2.5 py-1 text-xs font-medium text-brand-800">
+                      待點名
+                    </span>
+                  )}
+                  {renderActions(entry)}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      {notPicked.length > 0 && (
+        <section>
+          <h3 className="text-sm font-semibold text-slate-700">
+            沒挑這個時段（{notPicked.length}）
+          </h3>
+          {/* 人到了照樣可以標「到」—— 現場來的孩子不能因為家長忘了挑
+              就記不進去 */}
+          <ul className="mt-2 space-y-2">
+            {notPicked.map((entry) => (
+              <li
+                key={entry.id}
+                className="flex flex-wrap items-center gap-3 rounded-lg px-3 py-2 text-slate-500 ring-1 ring-slate-200/80"
+              >
+                <span className="font-medium">{entry.student_name}</span>
+                <span className="text-sm">{formatGrade(entry.grade)}</span>
+                {renderActions(entry)}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }
