@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CalendarPlus, Check, Trash2, X } from 'lucide-react';
+import { CalendarPlus, CalendarRange, Check, Trash2, X } from 'lucide-react';
 import AdminPageHeader from '../components/admin/AdminPageHeader';
 import Spinner, { PageLoading } from '../components/Spinner';
 import { useImeGuardedInput } from '../lib/hooks/useImeGuardedInput';
@@ -7,6 +7,7 @@ import { listAllContests, listContestEntries } from '../lib/contests';
 import {
   clearAttendance,
   createSession,
+  createSessions,
   deleteSession,
   listAttendance,
   listAttendanceForSessions,
@@ -15,6 +16,7 @@ import {
   updateSession,
   type NewTrainingSession,
 } from '../lib/training';
+import { planSeries, type SeriesForm } from '../lib/recurrence';
 import {
   formatGrade,
   formatTime,
@@ -27,7 +29,12 @@ import {
 const INPUT_CLASS =
   'mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-base outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20';
 
+const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六'];
+
 type SessionForm = Omit<NewTrainingSession, 'contest_id'>;
+
+/** 排整期的表單：日期是一個區間加上每週哪幾天，時間整期共用 */
+type SeriesFormState = SeriesForm & { note: string };
 
 /** 這一場是不是已經上過了。過去的場次只是紀錄，不該跟接下來要準備的搶注意力 */
 function isPast(session: TrainingSession): boolean {
@@ -51,6 +58,13 @@ const EMPTY_FORM: SessionForm = {
   note: '',
 };
 
+/** 9/6（六）。預覽只是要讓人認出是哪幾天，年份寫出來反而擠 */
+function formatPreviewDate(date: string): string {
+  const [, month, day] = date.split('-').map(Number);
+  const weekday = WEEKDAY_LABELS[new Date(`${date}T00:00:00Z`).getUTCDay()];
+  return `${month}/${day}（${weekday}）`;
+}
+
 /** 把場次清單換算成「每一場幾個孩子挑了」 */
 async function countSignups(
   sessions: TrainingSession[]
@@ -72,8 +86,14 @@ export default function AdminTrainingPage() {
   const [error, setError] = useState('');
 
   const [form, setForm] = useState<SessionForm | null>(null);
+  /*
+    排整期的表單。跟單場表單互斥 —— 同時開兩個只會讓人不確定按下儲存
+    會發生什麼事，所以開其中一個就把另一個關掉。
+  */
+  const [series, setSeries] = useState<SeriesFormState | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formError, setFormError] = useState('');
+  const [notice, setNotice] = useState('');
   const [saving, setSaving] = useState(false);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const [busySessionId, setBusySessionId] = useState<string | null>(null);
@@ -125,14 +145,52 @@ export default function AdminTrainingPage() {
     setSignupCounts(await countSignups(sessions));
   }
 
-  const noteIme = useImeGuardedInput<HTMLTextAreaElement>((note) => patch({ note }));
+  const noteIme = useImeGuardedInput<HTMLTextAreaElement>((note) => {
+    patch({ note });
+    setSeries((current) => (current ? { ...current, note } : current));
+  });
 
   function patch(next: Partial<SessionForm>) {
     setForm((current) => (current ? { ...current, ...next } : current));
   }
 
-  function startCreate() {
+  /** 沿用最後一場的時間：集訓通常整期同一個時段，只有日期在變 */
+  function lastTimes(): { start_time: string; end_time: string } {
+    const last = sessions[sessions.length - 1];
+    return last
+      ? { start_time: last.start_time.slice(0, 5), end_time: last.end_time.slice(0, 5) }
+      : { start_time: '', end_time: '' };
+  }
+
+  function startSeries() {
+    setForm(null);
     setEditingId(null);
+    setFormError('');
+    setNotice('');
+    setSeries({ from: '', to: '', weekdays: [], note: '', ...lastTimes() });
+  }
+
+  function patchSeries(next: Partial<SeriesFormState>) {
+    setSeries((current) => (current ? { ...current, ...next } : current));
+  }
+
+  function toggleWeekday(day: number) {
+    setSeries((current) =>
+      current
+        ? {
+            ...current,
+            weekdays: current.weekdays.includes(day)
+              ? current.weekdays.filter((d) => d !== day)
+              : [...current.weekdays, day].sort(),
+          }
+        : current
+    );
+  }
+
+  function startCreate() {
+    setSeries(null);
+    setEditingId(null);
+    setNotice('');
     /*
       新增第二場以後沿用上一場的時間：集訓通常是同一個時段，只有日期
       在變。全部留空等於每次都要重打一遍。
@@ -152,6 +210,8 @@ export default function AdminTrainingPage() {
   }
 
   function startEdit(session: TrainingSession) {
+    setSeries(null);
+    setNotice('');
     setEditingId(session.id);
     setForm({
       session_date: session.session_date,
@@ -164,6 +224,7 @@ export default function AdminTrainingPage() {
 
   function closeForm() {
     setForm(null);
+    setSeries(null);
     setEditingId(null);
     setFormError('');
   }
@@ -204,6 +265,40 @@ export default function AdminTrainingPage() {
     await reloadSessions();
   }
 
+  async function handleSaveSeries() {
+    if (!series) return;
+    const plan = planSeries(series, sessions);
+    if (plan.error) {
+      setFormError(plan.error);
+      return;
+    }
+
+    setSaving(true);
+    const note = series.note.trim() === '' ? null : series.note;
+    const { created, error: saveError } = await createSessions(
+      plan.dates.map((session_date) => ({
+        contest_id: contestId,
+        session_date,
+        start_time: series.start_time,
+        end_time: series.end_time,
+        note,
+      }))
+    );
+    setSaving(false);
+
+    if (saveError) {
+      setFormError(saveError);
+      return;
+    }
+    closeForm();
+    setNotice(
+      plan.skipped.length > 0
+        ? `排好 ${created} 場，另外 ${plan.skipped.length} 場之前已經排過了`
+        : `排好 ${created} 場`
+    );
+    await reloadSessions();
+  }
+
   async function handleDelete(id: string) {
     setBusySessionId(id);
     const { error: deleteError } = await deleteSession(id);
@@ -220,6 +315,9 @@ export default function AdminTrainingPage() {
 
   if (loading) return <PageLoading label="正在讀取比賽…" />;
 
+  // 邊填邊算，讓老莫在按下去之前就看到會排出哪幾天
+  const plan = series ? planSeries(series, sessions) : null;
+
   return (
     <>
       <AdminPageHeader
@@ -228,15 +326,26 @@ export default function AdminTrainingPage() {
         maxWidth="max-w-5xl"
         action={
           contestId !== '' &&
-          form === null && (
-            <button
-              type="button"
-              onClick={startCreate}
-              className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-            >
-              <CalendarPlus className="h-4 w-4" aria-hidden="true" />
-              排一場
-            </button>
+          form === null &&
+          series === null && (
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={startSeries}
+                className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+              >
+                <CalendarRange className="h-4 w-4" aria-hidden="true" />
+                排整期
+              </button>
+              <button
+                type="button"
+                onClick={startCreate}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              >
+                <CalendarPlus className="h-4 w-4" aria-hidden="true" />
+                只排一場
+              </button>
+            </div>
           )
         }
       />
@@ -246,6 +355,15 @@ export default function AdminTrainingPage() {
       {error && (
         <p role="alert" className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
           {error}
+        </p>
+      )}
+
+      {notice && (
+        <p
+          role="status"
+          className="mt-4 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800"
+        >
+          {notice}
         </p>
       )}
 
@@ -271,6 +389,156 @@ export default function AdminTrainingPage() {
           ))}
         </select>
       </div>
+
+      {series && (
+        <section className="mt-4 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200/80 sm:p-6">
+          <h2 className="text-lg font-semibold text-slate-900">排整期集訓</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            挑出這一期的起訖日期與每週上課的星期，一次把所有場次排好。
+            其中某一場要改時間或加備註，排好之後再單獨改那一場。
+          </p>
+
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="series_from" className="block text-sm font-medium text-slate-700">
+                從
+              </label>
+              <input
+                id="series_from"
+                type="date"
+                value={series.from}
+                onChange={(event) => patchSeries({ from: event.target.value })}
+                className={INPUT_CLASS}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="series_to" className="block text-sm font-medium text-slate-700">
+                到
+              </label>
+              <input
+                id="series_to"
+                type="date"
+                value={series.to}
+                onChange={(event) => patchSeries({ to: event.target.value })}
+                className={INPUT_CLASS}
+              />
+            </div>
+          </div>
+
+          <fieldset className="mt-4">
+            <legend className="text-sm font-medium text-slate-700">每週哪幾天</legend>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {WEEKDAY_LABELS.map((label, day) => {
+                const on = series.weekdays.includes(day);
+                return (
+                  <button
+                    key={day}
+                    type="button"
+                    onClick={() => toggleWeekday(day)}
+                    aria-pressed={on}
+                    aria-label={`星期${label}`}
+                    className={`h-11 w-11 rounded-full text-sm font-medium transition ${
+                      on
+                        ? 'bg-brand-600 text-white'
+                        : 'border border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
+
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="series_start" className="block text-sm font-medium text-slate-700">
+                開始時間
+              </label>
+              <input
+                id="series_start"
+                type="time"
+                value={series.start_time}
+                onChange={(event) => patchSeries({ start_time: event.target.value })}
+                className={INPUT_CLASS}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="series_end" className="block text-sm font-medium text-slate-700">
+                結束時間
+              </label>
+              <input
+                id="series_end"
+                type="time"
+                value={series.end_time}
+                onChange={(event) => patchSeries({ end_time: event.target.value })}
+                className={INPUT_CLASS}
+              />
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <label htmlFor="series_note" className="block text-sm font-medium text-slate-700">
+              備註
+              <span className="ml-2 text-xs font-normal text-slate-500">
+                選填，家長看得到，每一場都會帶上
+              </span>
+            </label>
+            <textarea
+              id="series_note"
+              rows={2}
+              value={series.note}
+              onChange={noteIme.onChange}
+              onCompositionStart={noteIme.onCompositionStart}
+              onCompositionEnd={noteIme.onCompositionEnd}
+              placeholder="這期要帶的東西、進度…"
+              className={INPUT_CLASS}
+            />
+          </div>
+
+          {plan && plan.error === null && (
+            <div className="mt-4 rounded-xl bg-brand-50 px-4 py-3 text-sm ring-1 ring-brand-100">
+              <p className="font-semibold text-brand-900">會排 {plan.dates.length} 場</p>
+              <p className="mt-1 break-words text-brand-800">
+                {plan.dates.map(formatPreviewDate).join('、')}
+              </p>
+              {plan.skipped.length > 0 && (
+                <p className="mt-1 text-xs text-brand-700">
+                  另外 {plan.skipped.length} 場之前已經排過了，這次會跳過
+                </p>
+              )}
+            </div>
+          )}
+
+          {formError && (
+            <p role="alert" className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+              {formError}
+            </p>
+          )}
+
+          <div className="mt-5 flex gap-3">
+            <button
+              type="button"
+              onClick={handleSaveSeries}
+              disabled={saving}
+              className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+            >
+              {saving && <Spinner />}
+              {saving ? '排課中…' : '排課'}
+            </button>
+            <button
+              type="button"
+              onClick={closeForm}
+              disabled={saving}
+              className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-600 transition hover:bg-slate-50 disabled:opacity-60"
+            >
+              取消
+            </button>
+          </div>
+        </section>
+      )}
 
       {form && (
         <section className="mt-4 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200/80 sm:p-6">

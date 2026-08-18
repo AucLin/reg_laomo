@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   cancelTrainingSignup,
   createSession,
+  createSessions,
   listAttendanceForSessions,
   markAttendance,
   signupTraining,
@@ -140,6 +141,48 @@ describe('createSession', () => {
       end_time: '11:00',
       note: null,
     });
+    expect(error).not.toBeNull();
+  });
+});
+
+describe('createSessions', () => {
+  it('沒有日期時不寫入，也不當成失敗', async () => {
+    expect(await createSessions([])).toEqual({ created: 0, error: null });
+    expect(from).not.toHaveBeenCalled();
+  });
+
+  it('一次送出整期，回傳實際建立的筆數', async () => {
+    const rows = ['2026-08-22', '2026-08-29'].map((session_date) => ({
+      contest_id: 'contest-1',
+      session_date,
+      start_time: '14:00',
+      end_time: '17:00',
+      note: null,
+    }));
+    builder.select.mockResolvedValue({ data: [{ id: 'a' }, { id: 'b' }], error: null });
+
+    const result = await createSessions(rows);
+
+    expect(builder.insert).toHaveBeenCalledWith(rows);
+    expect(result).toEqual({ created: 2, error: null });
+  });
+
+  /*
+    列級權限擋下時 PostgREST 回 204、error 是 null。只看 error 會讓畫面
+    顯示「排好 8 場」，實際上一場都沒進去。
+  */
+  it('回傳 0 筆時當成失敗', async () => {
+    builder.select.mockResolvedValue({ data: [], error: null });
+    const { created, error } = await createSessions([
+      {
+        contest_id: 'contest-1',
+        session_date: '2026-08-22',
+        start_time: '14:00',
+        end_time: '17:00',
+        note: null,
+      },
+    ]);
+    expect(created).toBe(0);
     expect(error).not.toBeNull();
   });
 });

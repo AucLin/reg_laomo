@@ -86,6 +86,34 @@ export async function createSession(
   return { error: null };
 }
 
+/*
+  一次建立整期的場次。
+
+  PostgREST 的批次寫入是一個交易，所以結果只有全建好或全沒建 —— 不會
+  出現「排了一半」讓管理員得自己找出缺哪幾天。回傳實際建立的筆數而不是
+  只回成功與否：畫面上要告訴老莫「排好 8 場」，那個數字得是資料庫認的。
+*/
+export async function createSessions(
+  rows: NewTrainingSession[]
+): Promise<{ created: number; error: string | null }> {
+  if (rows.length === 0) return { created: 0, error: null };
+
+  const { data, error } = await supabase
+    .from('training_sessions')
+    .insert(rows)
+    .select('id');
+
+  if (error) {
+    console.error('批次新增集訓場次失敗：', error.message);
+    return { created: 0, error: '排課失敗，請稍後再試' };
+  }
+  // 列級權限擋下時回 204、error 是 null，只能靠列數判斷
+  if ((data ?? []).length === 0) {
+    return { created: 0, error: '排課失敗，請重新登入後再試' };
+  }
+  return { created: (data ?? []).length, error: null };
+}
+
 export async function updateSession(
   id: string,
   input: Omit<NewTrainingSession, 'contest_id'>
