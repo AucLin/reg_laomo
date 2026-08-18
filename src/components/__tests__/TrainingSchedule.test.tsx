@@ -215,3 +215,112 @@ describe('TrainingSchedule', () => {
     });
   });
 });
+
+/*
+  已經上完的場次只是紀錄，不該跟「還要挑哪幾天」搶同一塊版面 ——
+  一期集訓十幾場，全部攤開家長得捲很久才找到還能挑的那幾天。
+*/
+describe('TrainingSchedule 分段', () => {
+  const PAST_SESSION: TrainingSession = {
+    ...FUTURE_SESSION,
+    id: 'past-1',
+    session_date: '2020-01-01',
+  };
+
+  it('還能挑的排前面，上完的收進「已經上完」', async () => {
+    setup({ sessions: [PAST_SESSION, FUTURE_SESSION] });
+    render(<TrainingSchedule />);
+
+    expect(await screen.findByText('接下來（1）')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /已經上完（1）/ })).toBeInTheDocument();
+  });
+
+  /*
+    收起來的東西家長點得開，但不預設攤開 —— 他打開這一頁是要挑日期的。
+  */
+  it('已經上完的預設收起來', async () => {
+    setup({ sessions: [PAST_SESSION, FUTURE_SESSION] });
+    render(<TrainingSchedule />);
+
+    await screen.findByText('接下來（1）');
+    expect(screen.getByRole('button', { name: /已經上完（1）/ })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
+  });
+
+  /*
+    整期都上完時攤開，不然畫面上只會剩一個標題。
+  */
+  it('沒有還能挑的場次時直接攤開', async () => {
+    setup({ sessions: [PAST_SESSION] });
+    render(<TrainingSchedule />);
+
+    expect(await screen.findByRole('button', { name: /已經上完（1）/ })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
+  });
+
+  /*
+    整期都上完了還催家長「還沒挑任何時段」，只會讓他以為自己漏了什麼 ——
+    那時候已經沒有東西可以挑。
+  */
+  it('整期上完時不催家長挑', async () => {
+    setup({ sessions: [PAST_SESSION] });
+    render(<TrainingSchedule />);
+
+    expect(await screen.findByText('這期集訓已上完')).toBeInTheDocument();
+    expect(screen.queryByText('還沒挑任何時段')).not.toBeInTheDocument();
+  });
+
+  /*
+    「已挑 N 個時段」回答的是「我挑完了嗎」，講的是還能挑的那幾場。
+    把上完的算進去，數字只會愈積愈大，家長看不出還有沒有事要做。
+  */
+  it('已挑的數量只算還能挑的場次', async () => {
+    setup({
+      sessions: [PAST_SESSION, FUTURE_SESSION],
+      marks: [
+        makeMark('signed_up'),
+        makeMark('signed_up', { id: 'att-past', session_id: 'past-1' }),
+      ],
+    });
+    render(<TrainingSchedule />);
+
+    expect(await screen.findByText('已挑 1 個時段')).toBeInTheDocument();
+  });
+
+  /*
+    上完的那幾場，家長要看的是「我家小孩那天到了沒」。
+  */
+  it('上完的場次顯示點名結果', async () => {
+    setup({ sessions: [PAST_SESSION], marks: [makeMark('present', { session_id: 'past-1' })] });
+    render(<TrainingSchedule />);
+
+    expect(await screen.findByText('已到')).toBeInTheDocument();
+    expect(screen.getByText('林小明')).toBeInTheDocument();
+  });
+
+  it('收起來的時候看不到，點開才出現', async () => {
+    setup({
+      sessions: [PAST_SESSION, FUTURE_SESSION],
+      marks: [makeMark('present', { id: 'att-past', session_id: 'past-1' })],
+    });
+    const user = userEvent.setup();
+    render(<TrainingSchedule />);
+
+    await screen.findByText('接下來（1）');
+    expect(screen.queryByText('已到')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /已經上完（1）/ }));
+    expect(screen.getByText('已到')).toBeInTheDocument();
+  });
+
+  it('沒挑的那幾天也講清楚', async () => {
+    setup({ sessions: [PAST_SESSION] });
+    render(<TrainingSchedule />);
+
+    expect(await screen.findByText('沒挑')).toBeInTheDocument();
+  });
+});
