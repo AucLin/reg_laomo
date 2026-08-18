@@ -5,6 +5,7 @@ import {
   SEARCH_LIMIT,
   OTHER_LEVEL_HINT_LIMIT,
 } from '../schools';
+import type { School } from '../types';
 
 const builder = {
   select: vi.fn(),
@@ -136,5 +137,101 @@ describe('searchOtherLevels', () => {
       cities: [],
     });
     expect(result).toEqual([]);
+  });
+});
+
+/*
+  同樣命中關鍵字時雙北排前面。四個預設縣市裡實際來上課的孩子絕大多數在
+  雙北，家長打「中正國小」跳出一整排同名學校，第一眼該看到他家那所。
+*/
+describe('雙北優先排序', () => {
+  const school = (name: string, city: string): School => ({
+    id: name,
+    code: name,
+    name,
+    level: 'elementary',
+    city,
+  });
+
+  beforeEach(() => {
+    for (const key of Object.keys(builder) as (keyof typeof builder)[]) {
+      builder[key].mockClear();
+      builder[key].mockReturnValue(builder);
+    }
+  });
+
+  it('雙北的學校排到其他縣市前面', async () => {
+    builder.limit.mockResolvedValue({
+      data: [
+        school('桃園中正國小', '桃園市'),
+        school('臺北中正國小', '臺北市'),
+        school('基隆中正國小', '基隆市'),
+        school('新北中正國小', '新北市'),
+      ],
+      error: null,
+    });
+
+    const result = await searchSchools({
+      level: 'elementary',
+      keyword: '中正',
+      cities: [],
+    });
+
+    expect(result.map((s) => s.name)).toEqual([
+      '臺北中正國小',
+      '新北中正國小',
+      '桃園中正國小',
+      '基隆中正國小',
+    ]);
+  });
+
+  it('同一個縣市內維持資料庫排好的校名順序', async () => {
+    builder.limit.mockResolvedValue({
+      data: [
+        school('中山國小', '臺北市'),
+        school('中正國小', '臺北市'),
+        school('文化國小', '臺北市'),
+      ],
+      error: null,
+    });
+
+    const result = await searchSchools({
+      level: 'elementary',
+      keyword: '中',
+      cities: [],
+    });
+
+    expect(result.map((s) => s.name)).toEqual(['中山國小', '中正國小', '文化國小']);
+  });
+
+  it('非雙北的學校照樣列得出來，只是排在後面', async () => {
+    // 這是排序不是篩選：桃園的孩子也報得了名
+    builder.limit.mockResolvedValue({
+      data: [school('桃園中正國小', '桃園市')],
+      error: null,
+    });
+
+    const result = await searchSchools({
+      level: 'elementary',
+      keyword: '中正',
+      cities: [],
+    });
+
+    expect(result.map((s) => s.name)).toEqual(['桃園中正國小']);
+  });
+
+  it('跨級別提示也雙北優先，只有三筆更要排對', async () => {
+    builder.limit.mockResolvedValue({
+      data: [school('桃園康橋高中', '桃園市'), school('康橋高中', '新北市')],
+      error: null,
+    });
+
+    const result = await searchOtherLevels({
+      level: 'elementary',
+      keyword: '康橋',
+      cities: [],
+    });
+
+    expect(result.map((s) => s.name)).toEqual(['康橋高中', '桃園康橋高中']);
   });
 });

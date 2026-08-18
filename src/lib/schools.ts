@@ -1,8 +1,31 @@
 import { supabase } from './supabase';
 import { normalizeSchoolKeyword } from './schoolKeyword';
+import { PRIORITY_CITIES } from './types';
 import type { School, SchoolLevel } from './types';
 
 export const SEARCH_LIMIT = 20;
+
+/**
+ * 把雙北的學校排到前面，其餘維持資料庫回傳的校名順序。
+ *
+ * 排在前端而不是資料庫：PostgREST 的 order 只吃欄位，要在資料庫做就得
+ * 為了排序在共用的學校名錄裡加一個「老莫的偏好」欄位，那是把這間補習班
+ * 的招生範圍寫死進一份全國名錄裡。
+ *
+ * 這樣做的前提是命中筆數沒被 SEARCH_LIMIT 截掉，否則排序救不回已經被
+ * 資料庫丟掉的那幾筆。實際查過名錄：最常見的校名「中正」「中山」全國
+ * 命中數各是 18 與 16 筆（國小，級別最多的一級），都在 20 以內；家長
+ * 一旦打了關鍵字就不會踩到上限。沒打關鍵字的瀏覽狀態會截，但那時本來
+ * 就只是隨便列前幾筆給家長看，雙北優先仍然比校名排序有用。
+ */
+function sortByCityPriority(schools: School[]): School[] {
+  const rank = (school: School) => {
+    const index = PRIORITY_CITIES.indexOf(school.city);
+    return index === -1 ? PRIORITY_CITIES.length : index;
+  };
+  // sort 在現行 JavaScript 保證穩定，同一個縣市內照樣是資料庫排好的校名順序
+  return [...schools].sort((a, b) => rank(a) - rank(b));
+}
 
 export interface SchoolQuery {
   level: SchoolLevel;
@@ -43,7 +66,7 @@ export async function searchSchools(query: SchoolQuery): Promise<School[]> {
     return [];
   }
 
-  return (data ?? []) as School[];
+  return sortByCityPriority((data ?? []) as School[]);
 }
 
 /** 跨級別提示只是給家長一個線索，不是搜尋結果，取少量就好 */
@@ -85,7 +108,8 @@ export async function searchOtherLevels(query: SchoolQuery): Promise<School[]> {
     return [];
   }
 
-  return (data ?? []) as School[];
+  // 提示只有三筆，更要讓雙北那筆排得到前面
+  return sortByCityPriority((data ?? []) as School[]);
 }
 
 /**
