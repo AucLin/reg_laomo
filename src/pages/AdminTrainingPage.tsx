@@ -3,10 +3,8 @@ import {
   CalendarPlus,
   CalendarRange,
   Check,
-  ChevronRight,
   Copy,
   Pencil,
-  StickyNote,
   Trash2,
   X,
 } from 'lucide-react';
@@ -28,6 +26,7 @@ import {
 } from '../lib/training';
 import { planSeries, type SeriesForm } from '../lib/recurrence';
 import { summariseHeadcount } from '../lib/trainingHeadcount';
+import { buildCalendar, type CalendarDay, type CalendarMonth } from '../lib/trainingCalendar';
 import {
   buildTrainingNoticeText,
   copyToClipboard,
@@ -96,7 +95,6 @@ export default function AdminTrainingPage() {
 
   // 展開哪一場的點名畫面
   const [rollCallFor, setRollCallFor] = useState<string | null>(null);
-  const [showFinished, setShowFinished] = useState<boolean | null>(null);
 
   /*
     這場比賽所有場次的挑選紀錄，以及已錄取的孩子。
@@ -335,10 +333,7 @@ export default function AdminTrainingPage() {
   // 邊填邊算，讓老莫在按下去之前就看到會排出哪幾天
   const plan = series ? planSeries(series, sessions) : null;
 
-  /*
-    接下來要上的排前面，已經上完的收在後面 —— 老莫每天要看的是前者。
-    整場比賽都上完時把後者攤開，不然畫面上會只剩一個標題。
-  */
+  // 通知文案只列還沒上的場次
   const upcoming = sessions.filter((session) => !isSessionPast(session));
   /*
     貼到 LINE 群組的通知。系統不會主動寄信 —— 家長本來就都在群組裡，
@@ -350,117 +345,173 @@ export default function AdminTrainingPage() {
     if (!contest) return '';
     return buildTrainingNoticeText(contest, upcoming, myRegistrationsUrl());
   })();
-  const finished = sessions.filter(isSessionPast);
   /* 每一場幾個人要來、哪幾場人少到該改時間 */
   const headcount = summariseHeadcount(sessions, enrolled, attendance);
-  const finishedOpen = showFinished ?? upcoming.length === 0;
+  const months = buildCalendar(sessions);
+  const selected = sessions.find((session) => session.id === rollCallFor) ?? null;
+
+  // 今天要標出來。用本地時間組字串 —— toISOString() 給的是 UTC 日期，
+  // 台灣早上八點前會標到前一天
+  const now = new Date();
+  const todayISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
   /*
-    一場一列。
+    月曆。
 
-    一期集訓十幾場，每一場一張大卡片就是十幾次捲動 —— 老莫要找的通常
-    是「下一場是哪天、幾個人」，那三件事應該在同一行看完。修改與刪除
-    收成圖示，名單點整列展開。
+    列表看得出「哪一場人少」，看不出「這一週都沒排」「連著三天都排」
+    —— 那正是要調時間時的依據：把人少的那天挪到旁邊有課的日子，一次
+    就補滿。點某一天的場次，詳情就展開在那個月底下。
   */
-  function renderRow(session: TrainingSession) {
+  function renderSessionChip(session: TrainingSession) {
     const past = isSessionPast(session);
-    const count = headcount.counts.get(session.id) ?? 0;
     const low = headcount.lowSessionIds.has(session.id);
     const open = rollCallFor === session.id;
+    const count = headcount.counts.get(session.id) ?? 0;
+
+    const tone = past
+      ? 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+      : low
+        ? 'bg-amber-100 text-amber-900 hover:bg-amber-200'
+        : 'bg-brand-100 text-brand-800 hover:bg-brand-200';
+
+    return (
+      <button
+        key={session.id}
+        type="button"
+        onClick={() => setRollCallFor(open ? null : session.id)}
+        aria-expanded={open}
+        className={`block w-full rounded-md px-1 py-1 text-left text-[11px] leading-tight transition sm:px-1.5 sm:py-0.5 ${tone} ${
+          open ? 'ring-2 ring-brand-500' : ''
+        }`}
+      >
+        <span className="sr-only">
+          {formatTime(session.start_time)} 開始，{count} 人要來，共 {headcount.enrolled}{' '}
+          位錄取
+          {low && !past && '，人偏少'}
+        </span>
+        {/* 手機的格子放不下時間，人數才是要看的 */}
+        <span className="hidden tabular-nums sm:inline" aria-hidden="true">
+          {formatTime(session.start_time)}{' '}
+        </span>
+        <span className="font-semibold tabular-nums" aria-hidden="true">
+          {count}/{headcount.enrolled}
+        </span>
+      </button>
+    );
+  }
+
+  function renderDay(day: CalendarDay, key: number) {
+    // 月初月末補的空格
+    if (day.date === null) return <div key={key} className="min-h-[72px] bg-slate-50/60" />;
+
+    const dayNumber = Number(day.date.slice(8));
+    const isToday = day.date === todayISO;
+
+    return (
+      <div key={day.date} className="min-h-[72px] space-y-0.5 bg-white p-1">
+        <div
+          className={`px-0.5 text-[11px] ${
+            isToday ? 'font-bold text-brand-700' : 'text-slate-400'
+          }`}
+        >
+          {dayNumber}
+        </div>
+        {day.sessions.map(renderSessionChip)}
+      </div>
+    );
+  }
+
+  function renderMonth(month: CalendarMonth) {
+    const prefix = `${month.year}-${String(month.month).padStart(2, '0')}`;
+    // 詳情展開在它自己那個月底下，不然選了第一個月的場次要捲到最後才看得到
+    const showDetail = selected !== null && selected.session_date.startsWith(prefix);
+
+    return (
+      <section key={prefix}>
+        <h2 className="mb-2 text-sm font-semibold text-slate-700">
+          {month.year} 年 {month.month} 月
+        </h2>
+        <div className="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/80">
+          <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50 text-center text-[11px] font-medium text-slate-500">
+            {WEEKDAY_LABELS.map((label) => (
+              <div key={label} className="py-1.5">
+                {label}
+              </div>
+            ))}
+          </div>
+          {/* gap-px 加上格子的白底，格線就是底色透出來的 */}
+          <div className="grid grid-cols-7 gap-px bg-slate-100">
+            {month.weeks.flat().map(renderDay)}
+          </div>
+        </div>
+        {showDetail && selected !== null && renderSelected(selected)}
+      </section>
+    );
+  }
+
+  /* 選中那一場的詳情：改時間、刪除，以及誰會來 */
+  function renderSelected(session: TrainingSession) {
+    const past = isSessionPast(session);
+    const low = headcount.lowSessionIds.has(session.id);
+    const count = headcount.counts.get(session.id) ?? 0;
     const confirming = confirmingDeleteId === session.id;
     const shortDate = formatShortDate(session.session_date);
 
-    /*
-      人數畫成長條，一眼就比得出哪幾場有人、哪幾場冷清 —— 十幾場的
-      數字排在一起是讀不出多寡的。長度是「這場來幾個 / 錄取幾個」。
-    */
-    const filled = headcount.enrolled === 0 ? 0 : (count / headcount.enrolled) * 100;
-    const barTone = past ? 'bg-slate-400' : low ? 'bg-amber-500' : 'bg-brand-500';
-    const numberTone = past
-      ? 'text-slate-500'
-      : low
-        ? 'text-amber-800'
-        : 'text-slate-700';
-
     return (
-      <li key={session.id} className={open ? 'bg-brand-50/40' : past ? 'bg-slate-50/70' : ''}>
-        <div className="flex items-center gap-1 px-2 py-1.5 sm:px-3">
-          <button
-            type="button"
-            onClick={() => setRollCallFor(open ? null : session.id)}
-            aria-expanded={open}
-            className="flex min-w-0 flex-1 items-start gap-2 rounded-xl px-2 py-2 text-left transition hover:bg-slate-100/70"
+      <div className="mt-3 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-brand-200">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-slate-100 px-4 py-3">
+          <span className={`font-semibold ${past ? 'text-slate-500' : 'text-slate-900'}`}>
+            {shortDate}
+          </span>
+          <span className="tabular-nums text-sm text-slate-600">
+            {formatTime(session.start_time)}–{formatTime(session.end_time)}
+          </span>
+          <span
+            className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+              past
+                ? 'bg-slate-100 text-slate-600'
+                : low
+                  ? 'bg-amber-100 text-amber-900'
+                  : 'bg-brand-100 text-brand-800'
+            }`}
           >
-            <ChevronRight
-              className={`mt-0.5 h-4 w-4 shrink-0 text-slate-400 transition-transform ${
-                open ? 'rotate-90' : ''
-              }`}
-              aria-hidden="true"
-            />
-            {/* 手機上放不下會換行，內容包成一組才不會掉到箭頭底下 */}
-            <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
-              <span className={`font-semibold ${past ? 'text-slate-500' : 'text-slate-900'}`}>
-                {shortDate}
-              </span>
-              <span
-                className={`tabular-nums text-sm ${past ? 'text-slate-400' : 'text-slate-600'}`}
-              >
-                {formatTime(session.start_time)}–{formatTime(session.end_time)}
-              </span>
-              <span className="flex shrink-0 items-center gap-2">
-                <span className="sr-only">
-                  {count} 人要來，這場比賽共 {headcount.enrolled} 位錄取
-                </span>
-                <span
-                  className="h-2 w-14 overflow-hidden rounded-full bg-slate-200/80 sm:w-20"
-                  aria-hidden="true"
-                >
-                  <span
-                    className={`block h-full rounded-full ${barTone}`}
-                    style={{ width: `${filled}%` }}
-                  />
-                </span>
-                <span
-                  className={`tabular-nums text-xs font-medium ${numberTone}`}
-                  aria-hidden="true"
-                >
-                  {count}/{headcount.enrolled}
-                </span>
-                {/* 人少到該改時間的那幾場要自己跳出來，不能只讓人去比長條 */}
-                {low && (
-                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
-                    人偏少
-                  </span>
-                )}
-              </span>
-              {/* 備註在列上只露一行，展開後才看得到全文 */}
-              {session.note && !open && (
-                <span className="flex min-w-0 items-center gap-1 text-xs text-amber-700">
-                  <StickyNote className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                  <span className="truncate">{session.note}</span>
-                </span>
-              )}
+            {count}/{headcount.enrolled} 人
+          </span>
+          {low && !past && (
+            <span className="text-xs text-amber-800">
+              人偏少，可以改到旁邊有課的日子把人併過來
             </span>
-          </button>
+          )}
 
-          <button
-            type="button"
-            onClick={() => startEdit(session)}
-            aria-label={`修改 ${shortDate} 這場`}
-            title="修改"
-            className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-200/70 hover:text-slate-800"
-          >
-            <Pencil className="h-4 w-4" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setConfirmingDeleteId(confirming ? null : session.id)}
-            aria-label={`刪除 ${shortDate} 這場`}
-            title="刪除"
-            className="rounded-lg p-2 text-slate-500 transition hover:bg-red-100 hover:text-red-700"
-          >
-            <Trash2 className="h-4 w-4" aria-hidden="true" />
-          </button>
+          <span className="ml-auto flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => startEdit(session)}
+              aria-label={`修改 ${shortDate} 這場`}
+              title="修改"
+              className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-200/70 hover:text-slate-800"
+            >
+              <Pencil className="h-4 w-4" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmingDeleteId(confirming ? null : session.id)}
+              aria-label={`刪除 ${shortDate} 這場`}
+              title="刪除"
+              className="rounded-lg p-2 text-slate-500 transition hover:bg-red-100 hover:text-red-700"
+            >
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setRollCallFor(null)}
+              aria-label="收起這場"
+              title="收起"
+              className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-200/70 hover:text-slate-800"
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </span>
         </div>
 
         {confirming && (
@@ -485,22 +536,19 @@ export default function AdminTrainingPage() {
           </div>
         )}
 
-        {open && (
-          <div className="border-t border-slate-100">
-            {(session.location || session.note) && (
-              <div className="px-4 pt-3 text-sm">
-                {session.location && <p className="text-slate-600">{session.location}</p>}
-                {session.note && (
-                  <p className="mt-1 whitespace-pre-wrap break-words rounded-lg bg-amber-50 px-3 py-2 text-amber-900 ring-1 ring-amber-100">
-                    {session.note}
-                  </p>
-                )}
-              </div>
+        {(session.location || session.note) && (
+          <div className="px-4 pt-3 text-sm">
+            {session.location && <p className="text-slate-600">{session.location}</p>}
+            {session.note && (
+              <p className="mt-1 whitespace-pre-wrap break-words rounded-lg bg-amber-50 px-3 py-2 text-amber-900 ring-1 ring-amber-100">
+                {session.note}
+              </p>
             )}
-            <RollCall session={session} onError={setError} onChanged={reloadCounts} />
           </div>
         )}
-      </li>
+
+        <RollCall session={session} onError={setError} onChanged={reloadCounts} />
+      </div>
     );
   }
 
@@ -836,60 +884,54 @@ export default function AdminTrainingPage() {
         </p>
       ) : (
         <div className="mt-6 space-y-6">
-          {upcoming.length > 0 && (
-            <section>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                  <span className="h-2 w-2 rounded-full bg-brand-500" aria-hidden="true" />
-                  接下來（{upcoming.length}）
-                </h2>
-                {noticeText !== '' && (
-                  <button
-                    type="button"
-                    onClick={() => handleCopyNotice(noticeText)}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-600 transition hover:bg-slate-50"
-                  >
-                    <Copy className="h-4 w-4" aria-hidden="true" />
-                    複製通知文案
-                  </button>
-                )}
-              </div>
-
-              {copyNote && (
-                <p
-                  role="status"
-                  className="mt-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-emerald-200"
-                >
-                  {copyNote}
-                </p>
-              )}
-              <ul className="mt-2 divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/80">
-                {upcoming.map(renderRow)}
-              </ul>
-            </section>
-          )}
-
-          {finished.length > 0 && (
-            <section>
-              <button
-                type="button"
-                onClick={() => setShowFinished(!finishedOpen)}
-                aria-expanded={finishedOpen}
-                className="flex items-center gap-2 text-sm font-semibold text-slate-500 transition hover:text-slate-700"
-              >
-                <ChevronRight
-                  className={`h-4 w-4 transition-transform ${finishedOpen ? 'rotate-90' : ''}`}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {/* 格子的顏色在講什麼 */}
+            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+              <span className="flex items-center gap-1.5">
+                <span
+                  className="h-3 w-3 rounded bg-brand-100 ring-1 ring-brand-200"
                   aria-hidden="true"
                 />
-                已經上完（{finished.length}）
+                有人挑了
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span
+                  className="h-3 w-3 rounded bg-amber-100 ring-1 ring-amber-200"
+                  aria-hidden="true"
+                />
+                人偏少
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span
+                  className="h-3 w-3 rounded bg-slate-100 ring-1 ring-slate-300"
+                  aria-hidden="true"
+                />
+                已經上完
+              </span>
+            </div>
+
+            {noticeText !== '' && (
+              <button
+                type="button"
+                onClick={() => handleCopyNotice(noticeText)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-600 transition hover:bg-slate-50"
+              >
+                <Copy className="h-4 w-4" aria-hidden="true" />
+                複製通知文案
               </button>
-              {finishedOpen && (
-                <ul className="mt-2 divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/80">
-                  {finished.map(renderRow)}
-                </ul>
-              )}
-            </section>
+            )}
+          </div>
+
+          {copyNote && (
+            <p
+              role="status"
+              className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-emerald-200"
+            >
+              {copyNote}
+            </p>
           )}
+
+          {months.map(renderMonth)}
         </div>
       )}
       </div>
