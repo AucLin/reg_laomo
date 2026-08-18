@@ -364,7 +364,7 @@ export default function AdminTrainingPage() {
           : 'bg-amber-100 text-amber-800';
 
     return (
-      <li key={session.id} className={past ? 'bg-slate-50/70' : ''}>
+      <li key={session.id} className={open ? 'bg-brand-50/40' : past ? 'bg-slate-50/70' : ''}>
         <div className="flex items-center gap-1 px-2 py-1.5 sm:px-3">
           <button
             type="button"
@@ -409,7 +409,7 @@ export default function AdminTrainingPage() {
             onClick={() => startEdit(session)}
             aria-label={`修改 ${shortDate} 這場`}
             title="修改"
-            className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+            className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-200/70 hover:text-slate-800"
           >
             <Pencil className="h-4 w-4" aria-hidden="true" />
           </button>
@@ -418,7 +418,7 @@ export default function AdminTrainingPage() {
             onClick={() => setConfirmingDeleteId(confirming ? null : session.id)}
             aria-label={`刪除 ${shortDate} 這場`}
             title="刪除"
-            className="rounded-lg p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+            className="rounded-lg p-2 text-slate-500 transition hover:bg-red-100 hover:text-red-700"
           >
             <Trash2 className="h-4 w-4" aria-hidden="true" />
           </button>
