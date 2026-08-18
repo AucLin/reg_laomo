@@ -361,7 +361,7 @@ export default function AdminTrainingPage() {
       {notice && (
         <p
           role="status"
-          className="mt-4 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800"
+          className="mt-4 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-emerald-200"
         >
           {notice}
         </p>
@@ -428,7 +428,7 @@ export default function AdminTrainingPage() {
 
           <fieldset className="mt-4">
             <legend className="text-sm font-medium text-slate-700">每週哪幾天</legend>
-            <div className="mt-2 flex flex-wrap gap-2">
+            <div className="mt-2 flex gap-1.5">
               {WEEKDAY_LABELS.map((label, day) => {
                 const on = series.weekdays.includes(day);
                 return (
@@ -438,7 +438,7 @@ export default function AdminTrainingPage() {
                     onClick={() => toggleWeekday(day)}
                     aria-pressed={on}
                     aria-label={`星期${label}`}
-                    className={`h-11 w-11 rounded-full text-sm font-medium transition ${
+                    className={`h-11 flex-1 rounded-full text-sm font-medium transition sm:w-11 sm:flex-none ${
                       on
                         ? 'bg-brand-600 text-white'
                         : 'border border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
