@@ -209,7 +209,7 @@ export default function AdminTrainingPage() {
     <>
       <AdminPageHeader
         title="集訓管理"
-        description="集訓場次掛在比賽底下。已錄取的孩子會在自己的頁面看到時間表，也能事先請假。"
+        description="集訓場次掛在比賽底下。排好的時段會出現在家長的頁面，家長挑哪幾場，孩子就會出現在那幾場的名單上。"
         maxWidth="max-w-5xl"
         action={
           contestId !== '' &&
