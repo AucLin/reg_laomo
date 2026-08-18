@@ -9,7 +9,10 @@ import StudentForm, {
   studentToFormValue,
   type StudentFormValue,
 } from '../components/StudentForm';
-import TrainingSchedule from '../components/TrainingSchedule';
+import TrainingSchedule, {
+  type TrainingSummary,
+} from '../components/TrainingSchedule';
+import PageJumpBar, { type JumpTarget } from '../components/PageJumpBar';
 import {
   ClipboardDoodle,
   DashedRule,
@@ -45,6 +48,8 @@ export default function MyRegistrationsPage() {
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
   const [studentError, setStudentError] = useState('');
   const [savingStudent, setSavingStudent] = useState(false);
+  /* 集訓那一段的資料在子元件手上，由它回報「還有幾場沒挑」給頂端那一條 */
+  const [training, setTraining] = useState<TrainingSummary | null>(null);
   const [confirmingStudentId, setConfirmingStudentId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -158,11 +163,30 @@ export default function MyRegistrationsPage() {
     );
   }
 
+  /*
+    頂端那一條快速跳。集訓只有在真的排了、而且還有能挑的場次時才列出來
+    —— 沒排集訓的家長按下去會跳到一個不存在的區塊。
+  */
+  const jumpTargets: JumpTarget[] = [
+    { id: 'kids', label: '我的孩子', count: students.length },
+    { id: 'signups', label: '我的報名', count: registrations.length },
+  ];
+  if (training !== null && training.upcoming > 0) {
+    jumpTargets.push({
+      id: 'training',
+      label: '集訓時間',
+      count: training.upcoming,
+      todo: training.pending > 0 ? `${training.pending} 場待挑` : undefined,
+    });
+  }
+
   return (
     <div className="min-h-screen bg-paper">
       <AppHeader />
       <div className="mx-auto max-w-3xl px-4 py-8 sm:py-12">
-        <section>
+        <PageJumpBar targets={jumpTargets} />
+
+        <section id="kids" className="scroll-mt-20">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div className="min-w-0">
               <h1 className="text-2xl font-bold text-slate-900">我的孩子</h1>
@@ -320,7 +344,7 @@ export default function MyRegistrationsPage() {
           </p>
         )}
 
-        <section className="mt-12">
+        <section id="signups" className="mt-12 scroll-mt-20">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div className="min-w-0">
               <h1 className="text-2xl font-bold text-slate-900">我的報名</h1>
@@ -349,7 +373,7 @@ export default function MyRegistrationsPage() {
               </Link>
             </div>
           ) : (
-            <ul className="mt-6 space-y-5">
+            <ul aria-label="報名紀錄" className="mt-6 space-y-5">
               {registrations.map((registration, index) => (
                 <li
                   key={registration.id}
@@ -458,7 +482,7 @@ export default function MyRegistrationsPage() {
         </section>
 
         {/* 沒排集訓的家長不會看到這一區，元件自己會回 null */}
-        <TrainingSchedule />
+        <TrainingSchedule onSummary={setTraining} />
       </div>
     </div>
   );

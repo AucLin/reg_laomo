@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import Spinner from './Spinner';
 import {
@@ -24,6 +24,13 @@ import {
   type TrainingAttendance,
   type TrainingSession,
 } from '../lib/types';
+
+export interface TrainingSummary {
+  /** 還能挑的場次數 */
+  upcoming: number;
+  /** 其中至少有一個孩子還沒挑的場次數 */
+  pending: number;
+}
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
 
@@ -77,7 +84,12 @@ const RESULT_TONE: Record<TrainingAttendance['status'], string> = {
   —— 一個補習班一次頂多幾十列 —— 所以一次全撈回來在前端對照，比為了
   這件事開一張檢視表划算。
 */
-export default function TrainingSchedule() {
+export default function TrainingSchedule({
+  onSummary,
+}: {
+  /* 頁面頂端的快速跳要顯示「還有幾場沒挑」，那份資料在這裡 */
+  onSummary?: (summary: TrainingSummary) => void;
+} = {}) {
   const [sessions, setSessions] = useState<TrainingSession[]>([]);
   const [entries, setEntries] = useState<ContestEntry[]>([]);
   const [contests, setContests] = useState<Contest[]>([]);
@@ -131,6 +143,57 @@ export default function TrainingSchedule() {
     setBusyKey(null);
   }
 
+  const byContest = useMemo(
+    () =>
+      contests
+        .map((contest) => ({
+          contest,
+          rows: sessions.filter((s) => s.contest_id === contest.id),
+          /*
+            只列錄取的孩子。集訓是錄取之後的事，還在審核的孩子挑了也沒用
+            —— 資料庫的 signup_training() 會擋，那時家長只會看到一句
+            錯誤訊息，不如一開始就不要給按。
+          */
+          kids: entries.filter(
+            (e) => e.contest_id === contest.id && e.status === 'enrolled'
+          ),
+        }))
+        .filter((group) => group.rows.length > 0 && group.kids.length > 0),
+    [contests, sessions, entries]
+  );
+
+  /*
+    回報給頁面頂端的快速跳。待辦算的是「還有幾場我還沒決定」——
+    一場裡只要有一個孩子沒挑就算，因為那場家長還有事要做。
+  */
+  const summary = useMemo<TrainingSummary>(() => {
+    let upcoming = 0;
+    let pending = 0;
+    for (const group of byContest) {
+      for (const session of group.rows) {
+        if (isPast(session)) continue;
+        upcoming += 1;
+        const undecided = group.kids.some(
+          (kid) =>
+            !marks.some(
+              (m) =>
+                m.session_id === session.id &&
+                m.entry_id === kid.id &&
+                m.status === 'signed_up'
+            )
+        );
+        if (undecided) pending += 1;
+      }
+    }
+    return { upcoming, pending };
+  }, [byContest, marks]);
+
+  useEffect(() => {
+    // 載入還沒完成時 summary 是 0/0，父層拿到的就是「還沒有事要做」
+    if (loading) return;
+    onSummary?.(summary);
+  }, [loading, onSummary, summary]);
+
   function markOf(sessionId: string, entryId: string): TrainingAttendance | undefined {
     return marks.find((m) => m.session_id === sessionId && m.entry_id === entryId);
   }
@@ -146,22 +209,6 @@ export default function TrainingSchedule() {
 
   // 沒排集訓的家長不該看到一塊空區塊
   if (sessions.length === 0) return null;
-
-  const byContest = contests
-    .map((contest) => ({
-      contest,
-      rows: sessions.filter((s) => s.contest_id === contest.id),
-      /*
-        只列錄取的孩子。集訓是錄取之後的事，還在審核的孩子挑了也沒用
-        —— 資料庫的 signup_training() 會擋，那時家長只會看到一句
-        錯誤訊息，不如一開始就不要給按。
-      */
-      kids: entries.filter(
-        (e) => e.contest_id === contest.id && e.status === 'enrolled'
-      ),
-    }))
-    .filter((group) => group.rows.length > 0 && group.kids.length > 0);
-
   if (byContest.length === 0) return null;
 
   /* 還能挑的那幾場：一場一塊，日期圈起來，右邊是每個孩子要不要來 */
@@ -300,7 +347,8 @@ export default function TrainingSchedule() {
   }
 
   return (
-    <section className="mt-12">
+    /* id 與 scroll-mt 是給頁面頂端的快速跳用的：黏在上面的那一條會蓋住標題 */
+    <section id="training" className="mt-12 scroll-mt-20">
       <div className="flex items-start gap-3 sm:gap-4">
         <CalendarDoodle className="h-12 w-12 shrink-0 text-brand-600 sm:h-16 sm:w-16" />
         <div className="min-w-0">

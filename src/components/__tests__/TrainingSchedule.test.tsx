@@ -324,3 +324,42 @@ describe('TrainingSchedule 分段', () => {
     expect(await screen.findByText('沒挑')).toBeInTheDocument();
   });
 });
+
+/*
+  頁面頂端的快速跳要講「還有幾場沒挑」—— 那件事排在頁面最下面，
+  沒捲到底的家長不會知道有事要做。資料在這個元件手上，所以由它回報。
+*/
+describe('TrainingSchedule 回報摘要', () => {
+  it('回報還能挑的場次數與其中還沒挑的', async () => {
+    setup({
+      sessions: [FUTURE_SESSION, { ...FUTURE_SESSION, id: 'session-2' }],
+      marks: [makeMark('signed_up')],
+    });
+    const onSummary = vi.fn();
+    render(<TrainingSchedule onSummary={onSummary} />);
+
+    await screen.findByText('已挑 1 個時段');
+    expect(onSummary).toHaveBeenLastCalledWith({ upcoming: 2, pending: 1 });
+  });
+
+  /* 上完的場次家長動不了，不該算進待辦 */
+  it('上完的場次不算待辦', async () => {
+    setup({ sessions: [{ ...FUTURE_SESSION, id: 'past-1', session_date: '2020-01-01' }] });
+    const onSummary = vi.fn();
+    render(<TrainingSchedule onSummary={onSummary} />);
+
+    await screen.findByText('這期集訓已上完');
+    expect(onSummary).toHaveBeenLastCalledWith({ upcoming: 0, pending: 0 });
+  });
+
+  /* 沒排集訓時也要回報，父層才知道那顆按鈕不必出現 */
+  it('沒排集訓時回報 0', async () => {
+    setup({ sessions: [] });
+    const onSummary = vi.fn();
+    render(<TrainingSchedule onSummary={onSummary} />);
+
+    await waitFor(() => {
+      expect(onSummary).toHaveBeenLastCalledWith({ upcoming: 0, pending: 0 });
+    });
+  });
+});

@@ -187,7 +187,9 @@ describe('MyRegistrationsPage', () => {
     renderPage();
 
     await screen.findByText('林小明');
-    const items = screen.getAllByRole('listitem');
+    const items = within(
+      screen.getByRole('list', { name: '報名紀錄' })
+    ).getAllByRole('listitem');
     expect(items).toHaveLength(2);
 
     await user.click(within(items[0]).getByRole('button', { name: '撤回報名' }));
