@@ -7,6 +7,7 @@ import {
   LogOut,
   Menu,
   Trophy,
+  Users,
   X,
 } from 'lucide-react';
 import { useAuth } from '../../auth/useAuth';
@@ -28,15 +29,17 @@ import { RobotMarkDoodle } from '../doodles';
 */
 
 /*
-  導覽分組。三個項目其實還不需要分組，但「日常」與「活動」是兩種不同的
-  工作節奏 —— 報名管理天天看，比賽與集訓是活動期間才碰 —— 標出來之後，
-  沒有活動在跑的日子眼睛可以整組跳過。日後長出使用者管理、信件範本，
-  再開第三組「設定」。
+  導覽分組。「日常」與「活動」是兩種不同的工作節奏 —— 報名與家長帳號
+  天天看，比賽與集訓是活動期間才碰 —— 標出來之後，沒有活動在跑的日子
+  眼睛可以整組跳過。日後長出信件範本那類設定，再開第三組。
 */
 const NAV_GROUPS = [
   {
     title: '日常',
-    items: [{ to: '/admin', label: '報名管理', icon: ClipboardList, end: true }],
+    items: [
+      { to: '/admin', label: '報名管理', icon: ClipboardList, end: true },
+      { to: '/admin/users', label: '家長帳號', icon: Users, end: false },
+    ],
   },
   {
     title: '活動',

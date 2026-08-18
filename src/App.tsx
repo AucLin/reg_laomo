@@ -11,6 +11,7 @@ import ContestsPage from './pages/ContestsPage';
 import AdminContestsPage from './pages/AdminContestsPage';
 import AdminLayout from './components/admin/AdminLayout';
 import AdminTrainingPage from './pages/AdminTrainingPage';
+import AdminUsersPage from './pages/AdminUsersPage';
 
 export default function App() {
   return (
@@ -52,6 +53,7 @@ export default function App() {
             <Route index element={<AdminPage />} />
             <Route path="contests" element={<AdminContestsPage />} />
             <Route path="training" element={<AdminTrainingPage />} />
+            <Route path="users" element={<AdminUsersPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
