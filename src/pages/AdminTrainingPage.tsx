@@ -237,7 +237,10 @@ export default function AdminTrainingPage() {
             {editingId ? '修改場次' : '排一場集訓'}
           </h2>
 
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          {/* 拿掉上課地點後剩三個欄位，兩欄格線會讓結束時間自己孤零零
+              佔一整列。三欄剛好一列排完，日期、開始、結束也本來就該
+              在同一行讀 */}
+          <div className="mt-4 grid gap-4 sm:grid-cols-3">
             <div>
               <label htmlFor="session_date" className="block text-sm font-medium text-slate-700">
                 日期
