@@ -4,6 +4,7 @@ import {
   CalendarRange,
   Check,
   ChevronRight,
+  Copy,
   Pencil,
   StickyNote,
   Trash2,
@@ -27,7 +28,13 @@ import {
 } from '../lib/training';
 import { planSeries, type SeriesForm } from '../lib/recurrence';
 import {
+  buildTrainingNoticeText,
+  copyToClipboard,
+  myRegistrationsUrl,
+} from '../lib/share';
+import {
   formatGrade,
+  formatShortDate,
   formatTime,
   type Contest,
   type ContestEntry,
@@ -67,13 +74,6 @@ const EMPTY_FORM: SessionForm = {
   note: '',
 };
 
-/** 9/6（六）。同一期集訓都在眼前這幾週，年份寫出來只是雜訊 */
-function formatShortDate(date: string): string {
-  const [, month, day] = date.split('-').map(Number);
-  const weekday = WEEKDAY_LABELS[new Date(`${date}T00:00:00Z`).getUTCDay()];
-  return `${month}/${day}（${weekday}）`;
-}
-
 /** 把場次清單換算成「每一場幾個孩子挑了」 */
 async function countSignups(
   sessions: TrainingSession[]
@@ -103,6 +103,8 @@ export default function AdminTrainingPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formError, setFormError] = useState('');
   const [notice, setNotice] = useState('');
+  // 複製的提示要自己收掉：它講的是剛才那個動作，不是畫面的狀態
+  const [copyNote, setCopyNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const [busySessionId, setBusySessionId] = useState<string | null>(null);
@@ -323,6 +325,15 @@ export default function AdminTrainingPage() {
     setBusySessionId(null);
   }
 
+  async function handleCopyNotice(text: string) {
+    const ok = await copyToClipboard(text);
+    // 複製失敗要說出來。靜靜地什麼都沒發生，老莫會以為複製好了
+    setCopyNote(
+      ok ? '通知文案已複製，貼到 LINE 群組就行' : '複製失敗，請手動選取後複製'
+    );
+    window.setTimeout(() => setCopyNote(''), 4000);
+  }
+
   if (loading) return <PageLoading label="正在讀取比賽…" />;
 
   // 邊填邊算，讓老莫在按下去之前就看到會排出哪幾天
@@ -333,6 +344,16 @@ export default function AdminTrainingPage() {
     整場比賽都上完時把後者攤開，不然畫面上會只剩一個標題。
   */
   const upcoming = sessions.filter((session) => !isPast(session));
+  /*
+    貼到 LINE 群組的通知。系統不會主動寄信 —— 家長本來就都在群組裡，
+    貼一則的到達率比信箱高得多，所以「發給家長」就是把這段文字複製走。
+    只列還沒上的場次：已經上完的寫進通知，家長會以為自己漏掉了什麼。
+  */
+  const noticeText = (() => {
+    const contest = contests.find((item) => item.id === contestId);
+    if (!contest) return '';
+    return buildTrainingNoticeText(contest, upcoming, myRegistrationsUrl());
+  })();
   const finished = sessions.filter(isPast);
   const finishedOpen = showFinished ?? upcoming.length === 0;
 
@@ -802,10 +823,31 @@ export default function AdminTrainingPage() {
         <div className="mt-6 space-y-6">
           {upcoming.length > 0 && (
             <section>
-              <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                <span className="h-2 w-2 rounded-full bg-brand-500" aria-hidden="true" />
-                接下來（{upcoming.length}）
-              </h2>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                  <span className="h-2 w-2 rounded-full bg-brand-500" aria-hidden="true" />
+                  接下來（{upcoming.length}）
+                </h2>
+                {noticeText !== '' && (
+                  <button
+                    type="button"
+                    onClick={() => handleCopyNotice(noticeText)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-600 transition hover:bg-slate-50"
+                  >
+                    <Copy className="h-4 w-4" aria-hidden="true" />
+                    複製通知文案
+                  </button>
+                )}
+              </div>
+
+              {copyNote && (
+                <p
+                  role="status"
+                  className="mt-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-emerald-200"
+                >
+                  {copyNote}
+                </p>
+              )}
               <ul className="mt-2 divide-y divide-slate-100 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200/80">
                 {upcoming.map(renderRow)}
               </ul>

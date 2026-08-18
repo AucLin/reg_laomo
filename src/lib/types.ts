@@ -337,3 +337,20 @@ export interface TrainingAttendance {
 export function formatTime(time: string): string {
   return time.slice(0, 5);
 }
+
+const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六'];
+
+/**
+ * 9/6（六）。
+ *
+ * 集訓的場次都在眼前這幾週，年份寫出來只是雜訊。星期是家長與老莫
+ * 真正拿來對行事曆的那一格，所以一定要有。
+ *
+ * 用 UTC 建構再讀 UTC：直接 new Date('2026-09-06') 在台灣時區會被
+ * 解讀成當地時間的午夜，某些日期會整個差一天。
+ */
+export function formatShortDate(date: string): string {
+  const [, month, day] = date.split('-').map(Number);
+  const weekday = WEEKDAY_LABELS[new Date(`${date}T00:00:00Z`).getUTCDay()];
+  return `${month}/${day}（${weekday}）`;
+}
