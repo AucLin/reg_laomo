@@ -276,10 +276,10 @@ export default function TrainingSchedule() {
         key={session.id}
         className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-3 py-2"
       >
-        <span className="tabular-nums text-sm font-medium text-slate-500">
+        <span className="w-[4.5rem] shrink-0 tabular-nums text-sm font-medium text-slate-500">
           {formatShortDate(session.session_date)}
         </span>
-        <span className="tabular-nums text-xs text-slate-400">
+        <span className="w-[5.5rem] shrink-0 tabular-nums text-xs text-slate-400">
           {formatTime(session.start_time)}–{formatTime(session.end_time)}
         </span>
         <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
