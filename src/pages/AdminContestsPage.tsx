@@ -322,14 +322,8 @@ export default function AdminContestsPage() {
     setBusyEntryId(null);
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-50">
-        <AppHeader />
-        <PageLoading label="正在讀取比賽…" />
-      </div>
-    );
-  }
+  // 外框（頁首、側邊欄、底色）由 AdminLayout 提供，這裡只出載入中的內容
+  if (loading) return <PageLoading label="正在讀取比賽…" />;
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">

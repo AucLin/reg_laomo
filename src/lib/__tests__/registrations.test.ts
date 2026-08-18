@@ -71,7 +71,7 @@ describe('registrations.ts', () => {
   describe('createRegistration', () => {
     it('新增成功時不回傳錯誤', async () => {
       registrationsBuilder.insert.mockResolvedValue({ error: null });
-      const result = await createRegistration({ ...input, parent_id: 'parent-1' });
+      const result = await createRegistration({ ...input, parent_id: 'parent-1', student_id: 'student-1' });
       expect(result).toEqual({ error: null });
     });
 
@@ -79,7 +79,7 @@ describe('registrations.ts', () => {
       registrationsBuilder.insert.mockResolvedValue({
         error: { message: '壞了' },
       });
-      const result = await createRegistration({ ...input, parent_id: 'parent-1' });
+      const result = await createRegistration({ ...input, parent_id: 'parent-1', student_id: 'student-1' });
       expect(result.error).toBe('送出失敗，請稍後再試');
     });
   });

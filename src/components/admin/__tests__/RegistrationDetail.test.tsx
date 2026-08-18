@@ -7,6 +7,7 @@ import type { AdminRegistrationRow } from '../../../lib/types';
 const registration: AdminRegistrationRow = {
   id: 'reg-1',
   parent_id: 'parent-1',
+  student_id: 'student-1',
   student_name: '林小明',
   student_gender: 'male',
   student_birthday: '2016-05-20',

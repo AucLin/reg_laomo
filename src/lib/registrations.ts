@@ -68,9 +68,16 @@ export async function getRegistration(
  * .select() 讀回實際受影響的列數。這件事本專案在
  * scripts/verify-rls.ts 已經實測證明過（見該檔案的相關註解）。
  */
+/*
+  編輯報名不換孩子：student_id 是這筆報名屬於誰，換人等於另一筆報名，
+  不是同一筆的修改。學生欄位仍然改得動 —— 那是送出當下的快照，
+  家長把年級打錯本來就該能改。
+*/
+export type RegistrationEdit = Omit<NewRegistration, 'parent_id' | 'student_id'>;
+
 export async function updateRegistration(
   id: string,
-  input: Omit<NewRegistration, 'parent_id'>
+  input: RegistrationEdit
 ): Promise<{ error: string | null }> {
   const { data, error } = await supabase
     .from('registrations')

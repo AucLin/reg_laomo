@@ -148,6 +148,7 @@ describe('ApplyPage', () => {
     vi.spyOn(registrationsModule, 'getRegistration').mockResolvedValue({
       id: 'reg-1',
       parent_id: 'parent-1',
+      student_id: 'student-1',
       student_name: '林小華',
       student_gender: 'female',
       student_birthday: '2015-03-10',
