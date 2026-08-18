@@ -300,7 +300,12 @@ export interface TrainingSession {
   session_date: string;
   start_time: string;
   end_time: string;
-  location: string;
+  /*
+    上課地點。目前只有一間教室，排場次時不再填，這裡一律是 null；
+    欄位留著是因為日後真的租了別的場地就用得上，而讓一個已經沒人寫入
+    的欄位躺著，比刪掉再回頭補一次遷移便宜。
+  */
+  location: string | null;
   note: string | null;
   created_at: string;
   updated_at: string;

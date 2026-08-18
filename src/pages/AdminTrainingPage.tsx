@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { CalendarPlus, Check, Trash2, X } from 'lucide-react';
+import AdminPageHeader from '../components/admin/AdminPageHeader';
 import Spinner, { PageLoading } from '../components/Spinner';
 import { useImeGuardedInput } from '../lib/hooks/useImeGuardedInput';
 import { listAllContests, listContestEntries } from '../lib/contests';
@@ -31,7 +32,6 @@ const EMPTY_FORM: SessionForm = {
   session_date: '',
   start_time: '',
   end_time: '',
-  location: '',
   note: '',
 };
 
@@ -84,7 +84,6 @@ export default function AdminTrainingPage() {
     setSessions(await listSessions(contestId));
   }
 
-  const locationIme = useImeGuardedInput((location) => patch({ location }));
   const noteIme = useImeGuardedInput<HTMLTextAreaElement>((note) => patch({ note }));
 
   function patch(next: Partial<SessionForm>) {
@@ -94,8 +93,8 @@ export default function AdminTrainingPage() {
   function startCreate() {
     setEditingId(null);
     /*
-      新增第二場以後沿用上一場的時間與地點：集訓通常是同一個場地、
-      同一個時段，只有日期在變。全部留空等於每次都要重打一遍。
+      新增第二場以後沿用上一場的時間：集訓通常是同一個時段，只有日期
+      在變。全部留空等於每次都要重打一遍。
     */
     const last = sessions[sessions.length - 1];
     setForm(
@@ -104,7 +103,6 @@ export default function AdminTrainingPage() {
             session_date: '',
             start_time: last.start_time.slice(0, 5),
             end_time: last.end_time.slice(0, 5),
-            location: last.location,
             note: '',
           }
         : EMPTY_FORM
@@ -118,7 +116,6 @@ export default function AdminTrainingPage() {
       session_date: session.session_date,
       start_time: session.start_time.slice(0, 5),
       end_time: session.end_time.slice(0, 5),
-      location: session.location,
       note: session.note ?? '',
     });
     setFormError('');
@@ -137,7 +134,6 @@ export default function AdminTrainingPage() {
     if (value.start_time === '') return '請填寫開始時間';
     if (value.end_time === '') return '請填寫結束時間';
     if (value.end_time <= value.start_time) return '結束時間要晚於開始時間';
-    if (value.location.trim() === '') return '請填寫上課地點';
     return null;
   }
 
@@ -152,7 +148,6 @@ export default function AdminTrainingPage() {
     setSaving(true);
     const payload = {
       ...form,
-      location: form.location.trim(),
       note: form.note?.trim() === '' ? null : form.note,
     };
     const { error: saveError } = editingId
@@ -185,24 +180,27 @@ export default function AdminTrainingPage() {
   if (loading) return <PageLoading label="正在讀取比賽…" />;
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold text-slate-900">集訓管理</h1>
-        {contestId !== '' && form === null && (
-          <button
-            type="button"
-            onClick={startCreate}
-            className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-          >
-            <CalendarPlus className="h-4 w-4" aria-hidden="true" />
-            排一場
-          </button>
-        )}
-      </div>
+    <>
+      <AdminPageHeader
+        title="集訓管理"
+        description="集訓場次掛在比賽底下。已錄取的孩子會在自己的頁面看到時間表，也能事先請假。"
+        maxWidth="max-w-5xl"
+        action={
+          contestId !== '' &&
+          form === null && (
+            <button
+              type="button"
+              onClick={startCreate}
+              className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+            >
+              <CalendarPlus className="h-4 w-4" aria-hidden="true" />
+              排一場
+            </button>
+          )
+        }
+      />
 
-      <p className="mt-2 text-sm text-slate-600">
-        集訓場次掛在比賽底下。已錄取的孩子會在自己的頁面看到時間表，也能事先請假。
-      </p>
+      <div className="mx-auto max-w-5xl px-4 py-6">
 
       {error && (
         <p role="alert" className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -249,22 +247,6 @@ export default function AdminTrainingPage() {
                 type="date"
                 value={form.session_date}
                 onChange={(event) => patch({ session_date: event.target.value })}
-                className={INPUT_CLASS}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="session_location" className="block text-sm font-medium text-slate-700">
-                上課地點
-              </label>
-              <input
-                id="session_location"
-                type="text"
-                value={form.location}
-                onChange={locationIme.onChange}
-                onCompositionStart={locationIme.onCompositionStart}
-                onCompositionEnd={locationIme.onCompositionEnd}
-                placeholder="例如：教室 A"
                 className={INPUT_CLASS}
               />
             </div>
@@ -366,7 +348,9 @@ export default function AdminTrainingPage() {
                     {session.session_date}　{formatTime(session.start_time)}–
                     {formatTime(session.end_time)}
                   </h2>
-                  <p className="mt-1 text-sm text-slate-600">{session.location}</p>
+                  {session.location && (
+                    <p className="mt-1 text-sm text-slate-600">{session.location}</p>
+                  )}
                   {session.note && (
                     <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-600">
                       {session.note}
@@ -432,7 +416,8 @@ export default function AdminTrainingPage() {
           ))}
         </ul>
       )}
-    </div>
+      </div>
+    </>
   );
 }
 

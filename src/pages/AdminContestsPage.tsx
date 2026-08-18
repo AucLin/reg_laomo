@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Check, Copy, Download, Eye, Share2 } from 'lucide-react';
+import AdminPageHeader from '../components/admin/AdminPageHeader';
 import StatusBadge from '../components/StatusBadge';
 import Spinner, { PageLoading } from '../components/Spinner';
 import { useImeGuardedInput } from '../lib/hooks/useImeGuardedInput';
@@ -326,19 +327,24 @@ export default function AdminContestsPage() {
   if (loading) return <PageLoading label="正在讀取比賽…" />;
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold text-slate-900">比賽管理</h1>
-        {form === null && (
-          <button
-            type="button"
-            onClick={startCreate}
-            className="rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-          >
-            新增比賽
-          </button>
-        )}
-      </div>
+    <>
+      <AdminPageHeader
+        title="比賽管理"
+        maxWidth="max-w-5xl"
+        action={
+          form === null && (
+            <button
+              type="button"
+              onClick={startCreate}
+              className="rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+            >
+              新增比賽
+            </button>
+          )
+        }
+      />
+
+      <div className="mx-auto max-w-5xl px-4 py-6">
 
       {error && (
         <p
@@ -878,7 +884,8 @@ export default function AdminContestsPage() {
           })}
         </ul>
       )}
-    </div>
+      </div>
+    </>
   );
 }
 

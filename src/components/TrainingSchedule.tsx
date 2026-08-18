@@ -165,7 +165,9 @@ export default function TrainingSchedule() {
                       {formatSessionDate(session.session_date)}
                       {formatTime(session.start_time)}–{formatTime(session.end_time)}
                     </p>
-                    <p className="text-sm text-slate-600">{session.location}</p>
+                    {session.location && (
+                      <p className="text-sm text-slate-600">{session.location}</p>
+                    )}
                     {session.note && (
                       <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-600">
                         {session.note}
