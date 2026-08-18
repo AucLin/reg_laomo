@@ -29,6 +29,21 @@ const INPUT_CLASS =
 
 type SessionForm = Omit<NewTrainingSession, 'contest_id'>;
 
+/** 這一場是不是已經上過了。過去的場次只是紀錄，不該跟接下來要準備的搶注意力 */
+function isPast(session: TrainingSession): boolean {
+  return new Date(`${session.session_date}T${session.start_time}`) < new Date();
+}
+
+/*
+  名單每一列的底色。點名結果用顏色講，老莫掃一眼就知道哪幾個還沒點到，
+  不必逐列讀按鈕的按下狀態。
+*/
+const ROW_TONE: Record<TrainingAttendance['status'], string> = {
+  signed_up: 'bg-brand-50 ring-brand-100',
+  present: 'bg-emerald-50 ring-emerald-200',
+  absent: 'bg-red-50 ring-red-200',
+};
+
 const EMPTY_FORM: SessionForm = {
   session_date: '',
   start_time: '',
@@ -366,34 +381,59 @@ export default function AdminTrainingPage() {
         </p>
       ) : (
         <ul className="mt-6 space-y-4">
-          {sessions.map((session) => (
+          {sessions.map((session) => {
+            const past = isPast(session);
+            const count = signupCounts.get(session.id) ?? 0;
+
+            return (
             <li
               key={session.id}
-              className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200/80"
+              className={`rounded-2xl p-5 shadow-sm ring-1 ${
+                past
+                  ? 'bg-slate-50 ring-slate-200/60'
+                  : 'border-l-4 border-brand-500 bg-white ring-slate-200/80'
+              }`}
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0 flex-1 break-words">
-                  <h2 className="flex flex-wrap items-center gap-2 font-semibold text-slate-900">
-                    <span>
-                      {session.session_date}　{formatTime(session.start_time)}–
-                      {formatTime(session.end_time)}
+                  <h2 className="flex flex-wrap items-center gap-2 font-semibold">
+                    <span className={past ? 'text-slate-500' : 'text-slate-900'}>
+                      {session.session_date}
                     </span>
-                    {/* 沒人挑也要把 0 寫出來，空白會被當成還沒載入 */}
                     <span
-                      className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                        (signupCounts.get(session.id) ?? 0) > 0
-                          ? 'bg-brand-100 text-brand-800'
-                          : 'bg-slate-100 text-slate-600'
+                      className={`tabular-nums text-sm font-medium ${
+                        past ? 'text-slate-400' : 'text-slate-600'
                       }`}
                     >
-                      {signupCounts.get(session.id) ?? 0} 人會來
+                      {formatTime(session.start_time)}–{formatTime(session.end_time)}
                     </span>
+                    {/*
+                      沒人挑也要把數字寫出來，空白會被當成還沒載入。顏色分三種：
+                      有人挑是藍的、還沒開始卻沒人挑是黃的（該打電話問了）、
+                      已經上完的場次就只是灰色的紀錄。
+                    */}
+                    <span
+                      className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                        count > 0
+                          ? 'bg-brand-100 text-brand-800'
+                          : past
+                            ? 'bg-slate-200 text-slate-600'
+                            : 'bg-amber-100 text-amber-800'
+                      }`}
+                    >
+                      {count > 0 ? `${count} 人會來` : past ? '沒人來' : '還沒人挑'}
+                    </span>
+                    {past && (
+                      <span className="rounded-full bg-slate-200 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+                        已結束
+                      </span>
+                    )}
                   </h2>
                   {session.location && (
                     <p className="mt-1 text-sm text-slate-600">{session.location}</p>
                   )}
                   {session.note && (
-                    <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-600">
+                    <p className="mt-2 whitespace-pre-wrap break-words rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900 ring-1 ring-amber-100">
                       {session.note}
                     </p>
                   )}
@@ -458,7 +498,8 @@ export default function AdminTrainingPage() {
                 />
               )}
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
       </div>
@@ -592,7 +633,7 @@ function RollCall({
             onClick={() => clear(entry.id)}
             disabled={busy}
             aria-label={`把 ${entry.student_name} 移出這個時段`}
-            className="rounded-lg p-1.5 text-slate-500 transition hover:bg-white disabled:opacity-60"
+            className="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-200/70 hover:text-slate-700 disabled:opacity-60"
           >
             <Trash2 className="h-4 w-4" aria-hidden="true" />
           </button>
@@ -603,13 +644,23 @@ function RollCall({
 
   return (
     <div className="mt-4 space-y-4 border-t border-slate-100 pt-4">
-      <p className="text-sm text-slate-600">
-        錄取 {entries.length} 人，這個時段 {coming.length} 人會來
-        {present > 0 && `，已到 ${present} 人`}
-      </p>
+      <div className="flex flex-wrap gap-2 text-xs font-medium">
+        <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-slate-700">
+          錄取 {entries.length} 人
+        </span>
+        <span className="rounded-lg bg-brand-50 px-2.5 py-1 text-brand-700">
+          這個時段 {coming.length} 人會來
+        </span>
+        {present > 0 && (
+          <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-emerald-700">
+            已到 {present} 人
+          </span>
+        )}
+      </div>
 
       <section>
-        <h3 className="text-sm font-semibold text-slate-700">
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+          <span className="h-2 w-2 rounded-full bg-brand-500" aria-hidden="true" />
           會來（{coming.length}）
         </h3>
         {coming.length === 0 ? (
@@ -622,13 +673,23 @@ function RollCall({
               return (
                 <li
                   key={entry.id}
-                  className="flex flex-wrap items-center gap-3 rounded-lg bg-slate-50 px-3 py-2"
+                  className={`flex flex-wrap items-center gap-3 rounded-lg px-3 py-2 ring-1 ${ROW_TONE[mark_?.status ?? 'signed_up']}`}
                 >
                   <span className="font-medium text-slate-800">{entry.student_name}</span>
                   <span className="text-sm text-slate-600">{formatGrade(entry.grade)}</span>
                   {mark_?.status === 'signed_up' && (
-                    <span className="rounded-full bg-brand-100 px-2.5 py-1 text-xs font-medium text-brand-800">
+                    <span className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-brand-700 ring-1 ring-brand-200">
                       待點名
+                    </span>
+                  )}
+                  {mark_?.status === 'present' && (
+                    <span className="rounded-full bg-emerald-600 px-2.5 py-1 text-xs font-medium text-white">
+                      已到
+                    </span>
+                  )}
+                  {mark_?.status === 'absent' && (
+                    <span className="rounded-full bg-red-600 px-2.5 py-1 text-xs font-medium text-white">
+                      沒到
                     </span>
                   )}
                   {renderActions(entry)}
@@ -641,7 +702,11 @@ function RollCall({
 
       {notPicked.length > 0 && (
         <section>
-          <h3 className="text-sm font-semibold text-slate-700">
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-500">
+            <span
+              className="h-2 w-2 rounded-full ring-1 ring-slate-400"
+              aria-hidden="true"
+            />
             沒挑這個時段（{notPicked.length}）
           </h3>
           {/* 人到了照樣可以標「到」—— 現場來的孩子不能因為家長忘了挑
@@ -650,7 +715,7 @@ function RollCall({
             {notPicked.map((entry) => (
               <li
                 key={entry.id}
-                className="flex flex-wrap items-center gap-3 rounded-lg px-3 py-2 text-slate-500 ring-1 ring-slate-200/80"
+                className="flex flex-wrap items-center gap-3 rounded-lg border border-dashed border-slate-300 px-3 py-2 text-slate-500"
               >
                 <span className="font-medium">{entry.student_name}</span>
                 <span className="text-sm">{formatGrade(entry.grade)}</span>
