@@ -19,6 +19,7 @@ import {
 import {
   formatShortDate,
   formatTime,
+  isSessionPast,
   type Contest,
   type ContestEntry,
   type TrainingAttendance,
@@ -41,11 +42,6 @@ function splitDate(date: string): { md: string; weekday: string } {
   // 會被解讀成當地時間的午夜，某些日期會整個差一天
   const weekday = WEEKDAYS[new Date(`${date}T00:00:00Z`).getUTCDay()];
   return { md: `${month}/${day}`, weekday };
-}
-
-/** 這一場是不是已經上過了。上完的只是紀錄，家長動不了 */
-function isPast(session: TrainingSession): boolean {
-  return new Date(`${session.session_date}T${session.start_time}`) < new Date();
 }
 
 /*
@@ -171,7 +167,7 @@ export default function TrainingSchedule({
     let pending = 0;
     for (const group of byContest) {
       for (const session of group.rows) {
-        if (isPast(session)) continue;
+        if (isSessionPast(session)) continue;
         upcoming += 1;
         const undecided = group.kids.some(
           (kid) =>
@@ -377,8 +373,8 @@ export default function TrainingSchedule({
           /*
             還能挑的排前面，上完的收在後面 —— 家長打開這一頁是要挑日期的。
           */
-          const upcoming = rows.filter((session) => !isPast(session));
-          const finished = rows.filter(isPast);
+          const upcoming = rows.filter((session) => !isSessionPast(session));
+          const finished = rows.filter(isSessionPast);
           const finishedOpen = openFinished.get(contest.id) ?? upcoming.length === 0;
 
           /*

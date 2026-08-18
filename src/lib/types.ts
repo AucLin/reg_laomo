@@ -333,6 +333,20 @@ export interface TrainingAttendance {
   updated_at: string;
 }
 
+/**
+ * 這一場是不是已經上過了。
+ *
+ * 上完的場次只是紀錄：家長改不了，管理員也只會回頭看誰到了。所以
+ * 畫面上到處都要拿它分兩堆，共用一份判斷才不會有的地方算開始時間、
+ * 有的地方算當天午夜。
+ */
+export function isSessionPast(session: {
+  session_date: string;
+  start_time: string;
+}): boolean {
+  return new Date(`${session.session_date}T${session.start_time}`) < new Date();
+}
+
 /** 時間欄位資料庫存的是 HH:MM:SS，畫面上只需要時分 */
 export function formatTime(time: string): string {
   return time.slice(0, 5);

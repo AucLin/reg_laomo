@@ -27,6 +27,7 @@ import {
   type NewTrainingSession,
 } from '../lib/training';
 import { planSeries, type SeriesForm } from '../lib/recurrence';
+import { summariseHeadcount } from '../lib/trainingHeadcount';
 import {
   buildTrainingNoticeText,
   copyToClipboard,
@@ -36,6 +37,7 @@ import {
   formatGrade,
   formatShortDate,
   formatTime,
+  isSessionPast,
   type Contest,
   type ContestEntry,
   type TrainingAttendance,
@@ -51,11 +53,6 @@ type SessionForm = Omit<NewTrainingSession, 'contest_id'>;
 
 /** 排整期的表單：日期是一個區間加上每週哪幾天，時間整期共用 */
 type SeriesFormState = SeriesForm & { note: string };
-
-/** 這一場是不是已經上過了。過去的場次只是紀錄，不該跟接下來要準備的搶注意力 */
-function isPast(session: TrainingSession): boolean {
-  return new Date(`${session.session_date}T${session.start_time}`) < new Date();
-}
 
 /*
   名單每一列的底色。點名結果用顏色講，老莫掃一眼就知道哪幾個還沒點到，
@@ -73,18 +70,6 @@ const EMPTY_FORM: SessionForm = {
   end_time: '',
   note: '',
 };
-
-/** 把場次清單換算成「每一場幾個孩子挑了」 */
-async function countSignups(
-  sessions: TrainingSession[]
-): Promise<Map<string, number>> {
-  const rows = await listAttendanceForSessions(sessions.map((s) => s.id));
-  const counts = new Map<string, number>();
-  for (const row of rows) {
-    counts.set(row.session_id, (counts.get(row.session_id) ?? 0) + 1);
-  }
-  return counts;
-}
 
 export default function AdminTrainingPage() {
   const [contests, setContests] = useState<Contest[]>([]);
@@ -114,10 +99,14 @@ export default function AdminTrainingPage() {
   const [showFinished, setShowFinished] = useState<boolean | null>(null);
 
   /*
-    每一場有幾個孩子挑了，鍵是場次 id。老莫排完時段最想知道的就是這個
-    數字，不該為了看它一場一場點開。
+    這場比賽所有場次的挑選紀錄，以及已錄取的孩子。
+
+    人數是老莫排完時段最想知道的事，但單看「3 人」判斷不了多寡 ——
+    要有分母（錄取幾個）跟旁邊幾場可以比。所以這裡留的是整份紀錄，
+    不是每場一個數字。
   */
-  const [signupCounts, setSignupCounts] = useState<Map<string, number>>(new Map());
+  const [attendance, setAttendance] = useState<TrainingAttendance[]>([]);
+  const [enrolled, setEnrolled] = useState<ContestEntry[]>([]);
 
   useEffect(() => {
     listAllContests()
@@ -139,7 +128,14 @@ export default function AdminTrainingPage() {
     listSessions(contestId).then(async (rows) => {
       if (!active) return;
       setSessions(rows);
-      setSignupCounts(await countSignups(rows));
+      const [marks, entries] = await Promise.all([
+        listAttendanceForSessions(rows.map((row) => row.id)),
+        listContestEntries(contestId),
+      ]);
+      if (!active) return;
+      setAttendance(marks);
+      // 集訓是錄取之後的事，待審核的孩子不算進分母
+      setEnrolled(entries.filter((entry) => entry.status === 'enrolled'));
       setLoadingSessions(false);
     });
     return () => {
@@ -150,11 +146,11 @@ export default function AdminTrainingPage() {
   async function reloadSessions() {
     const rows = await listSessions(contestId);
     setSessions(rows);
-    setSignupCounts(await countSignups(rows));
+    setAttendance(await listAttendanceForSessions(rows.map((row) => row.id)));
   }
 
   async function reloadCounts() {
-    setSignupCounts(await countSignups(sessions));
+    setAttendance(await listAttendanceForSessions(sessions.map((row) => row.id)));
   }
 
   const noteIme = useImeGuardedInput<HTMLTextAreaElement>((note) => {
@@ -343,7 +339,7 @@ export default function AdminTrainingPage() {
     接下來要上的排前面，已經上完的收在後面 —— 老莫每天要看的是前者。
     整場比賽都上完時把後者攤開，不然畫面上會只剩一個標題。
   */
-  const upcoming = sessions.filter((session) => !isPast(session));
+  const upcoming = sessions.filter((session) => !isSessionPast(session));
   /*
     貼到 LINE 群組的通知。系統不會主動寄信 —— 家長本來就都在群組裡，
     貼一則的到達率比信箱高得多，所以「發給家長」就是把這段文字複製走。
@@ -354,7 +350,9 @@ export default function AdminTrainingPage() {
     if (!contest) return '';
     return buildTrainingNoticeText(contest, upcoming, myRegistrationsUrl());
   })();
-  const finished = sessions.filter(isPast);
+  const finished = sessions.filter(isSessionPast);
+  /* 每一場幾個人要來、哪幾場人少到該改時間 */
+  const headcount = summariseHeadcount(sessions, enrolled, attendance);
   const finishedOpen = showFinished ?? upcoming.length === 0;
 
   /*
@@ -365,24 +363,24 @@ export default function AdminTrainingPage() {
     收成圖示，名單點整列展開。
   */
   function renderRow(session: TrainingSession) {
-    const past = isPast(session);
-    const count = signupCounts.get(session.id) ?? 0;
+    const past = isSessionPast(session);
+    const count = headcount.counts.get(session.id) ?? 0;
+    const low = headcount.lowSessionIds.has(session.id);
     const open = rollCallFor === session.id;
     const confirming = confirmingDeleteId === session.id;
     const shortDate = formatShortDate(session.session_date);
 
     /*
-      人數徽章分三種顏色：有人挑是藍的、還沒開始卻沒人挑是黃的（該打
-      電話問家長了）、已經上完的就只是灰色紀錄。
+      人數畫成長條，一眼就比得出哪幾場有人、哪幾場冷清 —— 十幾場的
+      數字排在一起是讀不出多寡的。長度是「這場來幾個 / 錄取幾個」。
     */
-    const badge =
-      count > 0
-        ? past
-          ? 'bg-slate-200 text-slate-700'
-          : 'bg-brand-100 text-brand-800'
-        : past
-          ? 'bg-slate-100 text-slate-500'
-          : 'bg-amber-100 text-amber-800';
+    const filled = headcount.enrolled === 0 ? 0 : (count / headcount.enrolled) * 100;
+    const barTone = past ? 'bg-slate-400' : low ? 'bg-amber-500' : 'bg-brand-500';
+    const numberTone = past
+      ? 'text-slate-500'
+      : low
+        ? 'text-amber-800'
+        : 'text-slate-700';
 
     return (
       <li key={session.id} className={open ? 'bg-brand-50/40' : past ? 'bg-slate-50/70' : ''}>
@@ -409,14 +407,31 @@ export default function AdminTrainingPage() {
               >
                 {formatTime(session.start_time)}–{formatTime(session.end_time)}
               </span>
-              <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${badge}`}>
-                {count > 0
-                  ? past
-                    ? `${count} 人`
-                    : `${count} 人會來`
-                  : past
-                    ? '沒人來'
-                    : '還沒人挑'}
+              <span className="flex shrink-0 items-center gap-2">
+                <span className="sr-only">
+                  {count} 人要來，這場比賽共 {headcount.enrolled} 位錄取
+                </span>
+                <span
+                  className="h-2 w-14 overflow-hidden rounded-full bg-slate-200/80 sm:w-20"
+                  aria-hidden="true"
+                >
+                  <span
+                    className={`block h-full rounded-full ${barTone}`}
+                    style={{ width: `${filled}%` }}
+                  />
+                </span>
+                <span
+                  className={`tabular-nums text-xs font-medium ${numberTone}`}
+                  aria-hidden="true"
+                >
+                  {count}/{headcount.enrolled}
+                </span>
+                {/* 人少到該改時間的那幾場要自己跳出來，不能只讓人去比長條 */}
+                {low && (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                    人偏少
+                  </span>
+                )}
               </span>
               {/* 備註在列上只露一行，展開後才看得到全文 */}
               {session.note && !open && (
