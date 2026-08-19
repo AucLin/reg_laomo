@@ -368,11 +368,19 @@ export default function AdminTrainingPage() {
     const open = rollCallFor === session.id;
     const count = headcount.counts.get(session.id) ?? 0;
 
+    /*
+      人數在文字底下畫一條長條。
+
+      只靠顏色只分得出「有人／人少」兩級 —— 9/10 跟 4/10 會是同一個
+      藍，要讀出多寡得逐格去看數字。長條獨立一條而不是把整塊底色填一半：
+      文字疊在填充的邊界上會糊掉，而且深到看得出比例的顏色，字就讀不了。
+    */
+    const filled = headcount.enrolled === 0 ? 0 : (count / headcount.enrolled) * 100;
     const tone = past
-      ? 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+      ? { chip: 'bg-slate-100 text-slate-600', track: 'bg-slate-200', bar: 'bg-slate-400' }
       : low
-        ? 'bg-amber-100 text-amber-900 hover:bg-amber-200'
-        : 'bg-brand-100 text-brand-800 hover:bg-brand-200';
+        ? { chip: 'bg-amber-50 text-amber-900', track: 'bg-amber-200/70', bar: 'bg-amber-500' }
+        : { chip: 'bg-brand-50 text-brand-900', track: 'bg-brand-200/70', bar: 'bg-brand-500' };
 
     return (
       <button
@@ -380,10 +388,19 @@ export default function AdminTrainingPage() {
         type="button"
         onClick={() => setRollCallFor(open ? null : session.id)}
         aria-expanded={open}
-        className={`block w-full rounded-md px-1 py-1 text-left text-[11px] leading-tight transition sm:px-1.5 sm:py-0.5 ${tone} ${
-          open ? 'ring-2 ring-brand-500' : ''
-        }`}
+        className={`relative block w-full rounded-md px-1 pb-2 pt-1 text-left text-[11px] leading-tight transition hover:brightness-95 sm:px-1.5 sm:pb-2 sm:pt-0.5 sm:text-xs ${
+          tone.chip
+        } ${open ? 'ring-2 ring-brand-500' : ''}`}
       >
+        <span
+          className={`absolute inset-x-1 bottom-1 h-1 overflow-hidden rounded-full ${tone.track}`}
+          aria-hidden="true"
+        >
+          <span
+            className={`block h-full rounded-full ${tone.bar}`}
+            style={{ width: `${filled}%` }}
+          />
+        </span>
         <span className="sr-only">
           {formatTime(session.start_time)} 開始，{count} 人要來，共 {headcount.enrolled}{' '}
           位錄取
@@ -402,13 +419,13 @@ export default function AdminTrainingPage() {
 
   function renderDay(day: CalendarDay, key: number) {
     // 月初月末補的空格
-    if (day.date === null) return <div key={key} className="min-h-[72px] bg-slate-50/60" />;
+    if (day.date === null) return <div key={key} className="min-h-[80px] bg-slate-50/60" />;
 
     const dayNumber = Number(day.date.slice(8));
     const isToday = day.date === todayISO;
 
     return (
-      <div key={day.date} className="min-h-[72px] space-y-0.5 bg-white p-1">
+      <div key={day.date} className="min-h-[80px] space-y-1 bg-white p-1">
         <div
           className={`px-0.5 text-[11px] ${
             isToday ? 'font-bold text-brand-700' : 'text-slate-400'
@@ -886,26 +903,24 @@ export default function AdminTrainingPage() {
         <div className="mt-6 space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             {/* 格子的顏色在講什麼 */}
-            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-slate-500">
+              {/* 色塊填多少就是來多少人，這件事要講出來才看得懂 */}
               <span className="flex items-center gap-1.5">
-                <span
-                  className="h-3 w-3 rounded bg-brand-100 ring-1 ring-brand-200"
-                  aria-hidden="true"
-                />
-                有人挑了
+                <span className="h-1 w-8 overflow-hidden rounded-full bg-brand-200/70" aria-hidden="true">
+                  <span className="block h-full w-3/4 rounded-full bg-brand-500" />
+                </span>
+                長條的長度＝來的人數
               </span>
               <span className="flex items-center gap-1.5">
-                <span
-                  className="h-3 w-3 rounded bg-amber-100 ring-1 ring-amber-200"
-                  aria-hidden="true"
-                />
+                <span className="h-1 w-8 overflow-hidden rounded-full bg-amber-200/70" aria-hidden="true">
+                  <span className="block h-full w-1/5 rounded-full bg-amber-500" />
+                </span>
                 人偏少
               </span>
               <span className="flex items-center gap-1.5">
-                <span
-                  className="h-3 w-3 rounded bg-slate-100 ring-1 ring-slate-300"
-                  aria-hidden="true"
-                />
+                <span className="h-1 w-8 overflow-hidden rounded-full bg-slate-200" aria-hidden="true">
+                  <span className="block h-full w-1/2 rounded-full bg-slate-400" />
+                </span>
                 已經上完
               </span>
             </div>
