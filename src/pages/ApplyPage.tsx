@@ -8,6 +8,7 @@ import StudentForm, {
   type StudentFormValue,
 } from '../components/StudentForm';
 import { useImeGuardedInput } from '../lib/hooks/useImeGuardedInput';
+import { avatarInitial, avatarTone } from '../lib/studentAvatar';
 import {
   createRegistration,
   getRegistration,
@@ -274,41 +275,86 @@ export default function ApplyPage() {
                 )}
               </>
             ) : (
-              <div className="space-y-3">
-                {students.map((student) => (
-                  <label
-                    key={student.id}
-                    className={`flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 transition ${
-                      selectedStudentId === student.id
-                        ? 'border-brand-600 bg-brand-50'
-                        : 'border-slate-300 bg-white'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="student"
-                      className="mt-1"
-                      checked={selectedStudentId === student.id}
-                      onChange={() => setSelectedStudentId(student.id)}
-                    />
-                    <span>
-                      <span className="block font-semibold text-slate-900">
-                        {student.name}
+              <div className="space-y-2.5">
+                {students.map((student) => {
+                  const picked = selectedStudentId === student.id;
+                  return (
+                    <label key={student.id} className="block cursor-pointer">
+                      {/*
+                        原生的圓鈕藏起來只留給鍵盤與讀螢幕的人用，整張卡片
+                        當成按鈕 —— 手機上那顆原生圓鈕只有十幾像素，家長
+                        戳半天戳不到。
+                      */}
+                      <input
+                        type="radio"
+                        name="student"
+                        className="peer sr-only"
+                        checked={picked}
+                        onChange={() => setSelectedStudentId(student.id)}
+                      />
+                      <span
+                        className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 transition peer-focus-visible:ring-2 peer-focus-visible:ring-brand-500/40 ${
+                          picked
+                            ? 'border-brand-600 bg-brand-50 shadow-sm'
+                            : 'border-slate-200 bg-white hover:border-brand-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span
+                          aria-hidden="true"
+                          className={`grid h-10 w-10 shrink-0 place-items-center rounded-full text-sm font-bold ${avatarTone(
+                            student.name
+                          )}`}
+                        >
+                          {avatarInitial(student.name)}
+                        </span>
+
+                        <span className="min-w-0 flex-1">
+                          <span className="block break-words font-semibold text-slate-900">
+                            {student.name}
+                          </span>
+                          <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                            <span className="rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-700">
+                              {formatGrade(student.grade)}
+                            </span>
+                            <span className="break-words text-slate-500">
+                              {student.school_name ?? student.school_name_raw}
+                            </span>
+                          </span>
+                        </span>
+
+                        <span
+                          aria-hidden="true"
+                          className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border-2 transition ${
+                            picked ? 'border-brand-600 bg-brand-600' : 'border-slate-300'
+                          }`}
+                        >
+                          {picked && (
+                            <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                          )}
+                        </span>
                       </span>
-                      <span className="block text-sm text-slate-600">
-                        {formatGrade(student.grade)}
-                        {' · '}
-                        {student.school_name ?? student.school_name_raw}
-                      </span>
-                    </span>
-                  </label>
-                ))}
+                    </label>
+                  );
+                })}
+
+                {/*
+                  用虛線框跟上面的實線卡片分開：它跟孩子排在同一欄，但按下去
+                  是換一種填法，不是又選了一個孩子。
+                */}
                 <button
                   type="button"
                   onClick={startAddNew}
-                  className="text-sm text-brand-600 underline"
+                  className="flex w-full items-center gap-3 rounded-xl border border-dashed border-slate-300 px-3 py-2.5 text-left transition hover:border-brand-400 hover:bg-brand-50/50"
                 >
-                  改為新增一位孩子
+                  <span
+                    aria-hidden="true"
+                    className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-slate-100 text-lg font-bold text-slate-500"
+                  >
+                    ＋
+                  </span>
+                  <span className="text-sm font-medium text-brand-700">
+                    改為新增一位孩子
+                  </span>
                 </button>
               </div>
             )}

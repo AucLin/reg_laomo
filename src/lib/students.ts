@@ -19,12 +19,25 @@ export interface NewStudent {
  */
 const VIEW = 'students_with_school';
 
+/**
+ * 目前這位登入者自己的孩子。
+ *
+ * 這裡要自己帶 parent_id 條件，不能只靠列級權限：權限裡有一條
+ * 「管理員可讀全部孩子」，所以老莫自己坐下來幫人報名時，光靠權限過濾
+ * 會把全部家長的孩子都列成「我的孩子」，挑錯一個就是把別人的孩子
+ * 掛到自己名下。家長端則是兩層條件同時成立，不受影響。
+ */
 export async function listMyStudents(): Promise<StudentWithSchool[]> {
-  // 不加 parent_id 條件 —— 列級權限已經把別人的孩子擋在資料庫外，
-  // 前端再加一次只是重複，而且會讓人誤以為安全性是靠前端達成的
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const parentId = session?.user.id;
+  if (!parentId) return [];
+
   const { data, error } = await supabase
     .from(VIEW)
     .select('*')
+    .eq('parent_id', parentId)
     .order('created_at', { ascending: true });
 
   if (error) {

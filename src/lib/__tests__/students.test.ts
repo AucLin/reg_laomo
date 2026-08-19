@@ -20,10 +20,19 @@ for (const key of Object.keys(builder) as (keyof typeof builder)[]) {
 }
 
 const from = vi.fn((_table: string) => builder);
-vi.mock('../supabase', () => ({ supabase: { from: (t: string) => from(t) } }));
+const getSession = vi.fn();
+vi.mock('../supabase', () => ({
+  supabase: {
+    from: (t: string) => from(t),
+    auth: { getSession: () => getSession() },
+  },
+}));
 
 beforeEach(() => {
   from.mockClear();
+  getSession.mockClear().mockResolvedValue({
+    data: { session: { user: { id: 'parent-1' } } },
+  });
   for (const key of Object.keys(builder) as (keyof typeof builder)[]) {
     builder[key].mockClear();
     builder[key].mockReturnValue(builder);
@@ -37,11 +46,21 @@ describe('listMyStudents', () => {
     expect(from).toHaveBeenCalledWith('students_with_school');
   });
 
-  it('不自己加 parent_id 條件，交給列級權限', async () => {
-    // 前端再加條件只是重複，而且會讓人以為安全性靠前端
+  /*
+    列級權限有一條「管理員可讀全部孩子」，只靠權限過濾的話，管理員自己
+    要報名時看到的會是全部家長的孩子。這個條件不是為了安全，是為了
+    「我的孩子」名副其實。
+  */
+  it('只回目前登入這位的孩子', async () => {
     builder.order.mockResolvedValue({ data: [], error: null });
     await listMyStudents();
-    expect(builder.eq).not.toHaveBeenCalled();
+    expect(builder.eq).toHaveBeenCalledWith('parent_id', 'parent-1');
+  });
+
+  it('還沒登入就回空陣列，不去查資料庫', async () => {
+    getSession.mockResolvedValue({ data: { session: null } });
+    expect(await listMyStudents()).toEqual([]);
+    expect(from).not.toHaveBeenCalled();
   });
 
   it('查詢出錯時回空陣列，不讓整個頁面壞掉', async () => {
