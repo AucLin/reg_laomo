@@ -48,6 +48,14 @@ const INPUT_CLASS =
 
 const WEEKDAY_LABELS = ['日', '一', '二', '三', '四', '五', '六'];
 
+/*
+  日曆格子裡「一個點一個人」最多畫到幾個人。
+
+  超過就只留長條 —— 一格的寬度大概放得下十來個點，再多會擠成三四排，
+  數起來比直接讀「28/40」還慢，那時候長條反而是比較好的工具。
+*/
+const MAX_DOTS = 12;
+
 type SessionForm = Omit<NewTrainingSession, 'contest_id'>;
 
 /** 排整期的表單：日期是一個區間加上每週哪幾天，時間整期共用 */
@@ -369,18 +377,35 @@ export default function AdminTrainingPage() {
     const count = headcount.counts.get(session.id) ?? 0;
 
     /*
-      人數在文字底下畫一條長條。
+      人數用兩層講：上面一條長條給比例，下面一排點給實際人數。
 
       只靠顏色只分得出「有人／人少」兩級 —— 9/10 跟 4/10 會是同一個
       藍，要讀出多寡得逐格去看數字。長條獨立一條而不是把整塊底色填一半：
       文字疊在填充的邊界上會糊掉，而且深到看得出比例的顏色，字就讀不了。
+      長條解決了「誰多誰少」，但 6 跟 7 的長度差還是得比對才分得出來，
+      所以再補一排點 —— 一個點一個人，直接數，不必讀數字。
     */
     const filled = headcount.enrolled === 0 ? 0 : (count / headcount.enrolled) * 100;
     const tone = past
-      ? { chip: 'bg-slate-100 text-slate-600', track: 'bg-slate-200', bar: 'bg-slate-400' }
+      ? {
+          chip: 'bg-slate-100 text-slate-600',
+          track: 'bg-slate-200',
+          bar: 'bg-slate-400',
+          dotOff: 'bg-slate-300',
+        }
       : low
-        ? { chip: 'bg-amber-50 text-amber-900', track: 'bg-amber-200/70', bar: 'bg-amber-500' }
-        : { chip: 'bg-brand-50 text-brand-900', track: 'bg-brand-200/70', bar: 'bg-brand-500' };
+        ? {
+            chip: 'bg-amber-50 text-amber-900',
+            track: 'bg-amber-200/70',
+            bar: 'bg-amber-500',
+            dotOff: 'bg-amber-200',
+          }
+        : {
+            chip: 'bg-brand-50 text-brand-900',
+            track: 'bg-brand-200/70',
+            bar: 'bg-brand-500',
+            dotOff: 'bg-brand-200',
+          };
 
     return (
       <button
@@ -388,12 +413,26 @@ export default function AdminTrainingPage() {
         type="button"
         onClick={() => setRollCallFor(open ? null : session.id)}
         aria-expanded={open}
-        className={`relative block w-full rounded-md px-1 pb-2 pt-1 text-left text-[11px] leading-tight transition hover:brightness-95 sm:px-1.5 sm:pb-2 sm:pt-0.5 sm:text-xs ${
+        className={`block w-full rounded-md px-1 py-1 text-left text-[11px] leading-tight transition hover:brightness-95 sm:px-1.5 sm:text-xs ${
           tone.chip
         } ${open ? 'ring-2 ring-brand-500' : ''}`}
       >
+        <span className="sr-only">
+          {formatTime(session.start_time)} 開始，{count} 人要來，共 {headcount.enrolled}{' '}
+          位錄取
+          {low && !past && '，人偏少'}
+        </span>
+        <span className="block" aria-hidden="true">
+          {/* 手機的格子放不下時間，人數才是要看的 */}
+          <span className="hidden tabular-nums sm:inline">
+            {formatTime(session.start_time)}{' '}
+          </span>
+          <span className="font-semibold tabular-nums">
+            {count}/{headcount.enrolled}
+          </span>
+        </span>
         <span
-          className={`absolute inset-x-1 bottom-1 h-1 overflow-hidden rounded-full ${tone.track}`}
+          className={`mt-1 block h-1 overflow-hidden rounded-full ${tone.track}`}
           aria-hidden="true"
         >
           <span
@@ -401,18 +440,21 @@ export default function AdminTrainingPage() {
             style={{ width: `${filled}%` }}
           />
         </span>
-        <span className="sr-only">
-          {formatTime(session.start_time)} 開始，{count} 人要來，共 {headcount.enrolled}{' '}
-          位錄取
-          {low && !past && '，人偏少'}
-        </span>
-        {/* 手機的格子放不下時間，人數才是要看的 */}
-        <span className="hidden tabular-nums sm:inline" aria-hidden="true">
-          {formatTime(session.start_time)}{' '}
-        </span>
-        <span className="font-semibold tabular-nums" aria-hidden="true">
-          {count}/{headcount.enrolled}
-        </span>
+        {headcount.enrolled <= MAX_DOTS && (
+          <span
+            className="mt-1 flex flex-wrap gap-[2px] sm:gap-[3px]"
+            aria-hidden="true"
+          >
+            {Array.from({ length: headcount.enrolled }, (_, index) => (
+              <span
+                key={index}
+                className={`h-1.5 w-1.5 rounded-full ${
+                  index < count ? tone.bar : tone.dotOff
+                }`}
+              />
+            ))}
+          </span>
+        )}
       </button>
     );
   }
@@ -904,12 +946,24 @@ export default function AdminTrainingPage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             {/* 格子的顏色在講什麼 */}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-slate-500">
-              {/* 色塊填多少就是來多少人，這件事要講出來才看得懂 */}
+              {/* 長條給比例、點給人數，兩件事都要講出來才看得懂 */}
               <span className="flex items-center gap-1.5">
-                <span className="h-1 w-8 overflow-hidden rounded-full bg-brand-200/70" aria-hidden="true">
-                  <span className="block h-full w-3/4 rounded-full bg-brand-500" />
+                <span className="flex flex-col gap-[3px]" aria-hidden="true">
+                  <span className="h-1 w-8 overflow-hidden rounded-full bg-brand-200/70">
+                    <span className="block h-full w-3/4 rounded-full bg-brand-500" />
+                  </span>
+                  <span className="flex gap-[3px]">
+                    {[0, 1, 2, 3].map((index) => (
+                      <span
+                        key={index}
+                        className={`h-1.5 w-1.5 rounded-full ${
+                          index < 3 ? 'bg-brand-500' : 'bg-brand-200'
+                        }`}
+                      />
+                    ))}
+                  </span>
                 </span>
-                長條的長度＝來的人數
+                一個點＝一個人，長條是比例
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="h-1 w-8 overflow-hidden rounded-full bg-amber-200/70" aria-hidden="true">
