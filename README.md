@@ -203,4 +203,6 @@ docs/            部署與寄信設定的操作手冊
 
 ## 授權
 
-尚未指定授權條款。要開放別人取用的話，記得補一份 LICENSE。
+程式碼採 [MIT 授權](LICENSE)，可以自由取用、修改、商用，附上授權條款即可。
+
+不在授權範圍內的兩樣東西：`public/hero.webp` 是圖庫照片，授權跟著原圖庫走；「老莫機器人」是店名，拿去架自己的系統時請換成自己的名字（改 `index.html`、`src/components/AppHeader.tsx`、`src/pages/LandingPage.tsx` 與 `supabase/templates/` 底下的信件範本）。
