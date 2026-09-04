@@ -24,7 +24,7 @@
 
 React 18 + TypeScript + Vite + Tailwind CSS，路由用 React Router，表單驗證用 Zod，測試用 Vitest + Testing Library。
 
-後端是 Supabase（PostgreSQL + Auth），權限完全靠資料庫的列級安全性（RLS）政策把關 —— 前端拿的是公開的 anon 金鑰，能讀寫什麼由資料庫決定，不是由畫面決定。另有一支 Netlify 無伺服器函式 `/api/contest-info`，替後台代抓比賽官網的網頁（瀏覽器受同源政策擋著抓不到）。
+後端是 Supabase（PostgreSQL + Auth），權限完全靠資料庫的列級安全性（RLS）政策把關 —— 前端拿的是公開的 anon 金鑰，能讀寫什麼由資料庫決定，不是由畫面決定。另有一支 Netlify 無伺服器函式 `/api/contest-info`，替後台代抓比賽官網的網頁（瀏覽器受同源政策擋著抓不到）；它只放行登入的管理員，否則就成了誰都能用的網頁代理。
 
 ---
 
@@ -155,7 +155,7 @@ npm run verify:rls
 
 ## 部署
 
-推到 GitHub，在 Netlify 匯入這個 repo 就好，`netlify.toml` 已經寫好建置設定。要注意的只有兩件事：**環境變數只填 `VITE_` 開頭那兩個**（service_role 金鑰在 Netlify 上完全用不到），以及**拿到正式網址後要回 Supabase 補 URL 設定**，不然認證信裡的連結會指回 localhost。
+推到 GitHub，在 Netlify 匯入這個 repo 就好，`netlify.toml` 已經寫好建置設定。要注意三件事：**環境變數只填 `VITE_` 開頭那兩個**（service_role 金鑰在 Netlify 上完全用不到）、**那兩個變數的作用範圍要包含 Functions**（`/api/contest-info` 要靠它們驗管理員身分，Netlify 預設就是全部範圍，改過才要留意），以及**拿到正式網址後要回 Supabase 補 URL 設定**，不然認證信裡的連結會指回 localhost。
 
 完整步驟與上線後的實測清單見 [`docs/netlify-deploy.md`](docs/netlify-deploy.md)。
 

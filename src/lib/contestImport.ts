@@ -1,3 +1,4 @@
+import { supabase } from './supabase';
 import { parseContestText, type ParsedContest } from './contestParse';
 
 export interface ImportResult {
@@ -13,11 +14,25 @@ export interface ImportResult {
  * 限制，前端直接抓別人的官網會被 CORS 擋下。那支函式只負責抓回原始
  * HTML 與擋掉內網位址，解析一律用 parseContestText，跟「貼上文字」
  * 走的是同一份邏輯，兩邊才不會給出不同的結果。
+ *
+ * 要帶登入權杖過去：那支函式只放行管理員，否則它就成了誰都能用的
+ * 網頁代理。權杖由 Supabase 的用戶端管理，過期會自動換新，這裡取到
+ * 的一定是當下有效的那一把。
  */
 export async function importContestFromUrl(url: string): Promise<ImportResult> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session) {
+    return { parsed: null, sourceUrl: null, error: '登入狀態已失效，請重新登入' };
+  }
+
   let response: Response;
   try {
-    response = await fetch(`/api/contest-info?url=${encodeURIComponent(url)}`);
+    response = await fetch(`/api/contest-info?url=${encodeURIComponent(url)}`, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    });
   } catch {
     return { parsed: null, sourceUrl: null, error: '連線失敗，請稍後再試' };
   }
