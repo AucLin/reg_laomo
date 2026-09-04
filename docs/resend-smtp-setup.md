@@ -6,20 +6,15 @@ Supabase 內建的寄信服務**一小時只能寄 2 到 4 封**，而且明文�
 
 接上 Resend 之後，寄信改走你自己的網域，額度是免費方案每天 3000 封（每月 100 封以內不限網域），也能在 Resend 後台看到每封信的送達狀況。
 
-**目前的狀態**（2026-08-17 查證）：`mailer_autoconfirm = false`，也就是信箱驗證開著，家長註冊後必須收信點連結才能登入。系統的程式碼兩種設定都支援，但只要維持驗證開著，這份設定就是上線前必做。
+**預設的狀態**：`supabase/config.example.toml` 裡 `enable_confirmations = true`，也就是信箱驗證開著，家長註冊後必須收信點連結才能登入。系統的程式碼兩種設定都支援，但只要維持驗證開著，這份設定就是上線前必做。
 
 ---
 
-## 第一步：Resend 這邊（大部分已經完成）
+## 第一步：Resend 這邊
 
-### 1. 寄件網域 — 已驗證，不用再做
+### 1. 驗證寄件網域
 
-這個 Resend 帳號底下的 **`example.org` 已經是 verified 狀態**（東京區 `ap-northeast-1`，2026-01-12 建立），DNS 記錄都設好了，可以直接拿來寄信。
-
-所以下面這段 DNS 設定**你不用做**，留著供日後要換網域時參考：
-
-<details>
-<summary>從零開始驗證新網域的話要做什麼（點開）</summary>
+寄件網域必須先在 Resend 驗證過，信才寄得出去、也才不會被判成垃圾信。
 
 到 https://resend.com 的 **Domains** → **Add Domain**，填入網域後，Resend 會給你幾筆 DNS 記錄，到網域註冊商的設定頁面加進去：
 
@@ -34,15 +29,11 @@ DNS 生效通常幾分鐘到幾小時，狀態變成 **Verified** 才算完成�
 
 沒有驗證網域也能用 Resend 的測試網域 `onboarding@resend.dev`，但那只能寄給帳號本人，家長收不到。
 
-</details>
+### 2. 開一把 API 金鑰
 
-### 2. API 金鑰 — 沿用現有的就好
+**API Keys** → **Create API Key**，權限選 **Sending access**。**金鑰只會顯示這一次**，當下就要複製。
 
-API 金鑰請自己在 Resend 後台開一把（見下一段）。
-
-要新開一把也可以：**API Keys** → **Create API Key**，權限選 **Sending access**。**金鑰只會顯示這一次**，當下就要複製。
-
-分開用不同金鑰的好處是日後可以單獨作廢某一支服務的權限，不會波及其他專案。你自己權衡。
+每支服務用各自的金鑰，日後要作廢其中一支時不會波及其他專案。
 
 ### 3. 換算成 SMTP 帳密
 
@@ -59,7 +50,7 @@ Supabase 要的是 SMTP 形式，對應關係是：
 
 ## 第二步：Supabase 這邊
 
-進 https://supabase.com/dashboard，選專案 `your-project-ref`。
+進 https://supabase.com/dashboard，選你的專案。
 
 ### 1. 設定 SMTP
 
@@ -67,14 +58,14 @@ Supabase 要的是 SMTP 形式，對應關係是：
 
 | 欄位 | 填什麼 |
 |---|---|
-| Sender email | `noreply@example.org` |
+| Sender email | `noreply@你的網域` |
 | Sender name | `老莫機器人` |
 | Host | `smtp.resend.com` |
 | Port | `465` |
 | Username | `resend` |
 | Password | 你的 Resend API Key（`re_` 開頭那串） |
 
-`example.org` 已驗證，所以 Sender email 用這個網域底下的任何位址都可以（`noreply@`、`service@`、`robot@` 都行，收件方看到的就是這個）。
+網域驗證過之後，Sender email 用這個網域底下的任何位址都可以（`noreply@`、`service@`、`robot@` 都行，收件方看到的就是這個）。
 
 按 **Save**。
 

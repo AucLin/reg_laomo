@@ -76,8 +76,7 @@ export default async (req) => {
       redirect: 'follow',
       headers: {
         // 不少官網對沒有 User-Agent 的請求直接回 403
-        'User-Agent':
-          'Mozilla/5.0 (compatible; LaomoRobotBot/1.0; +https://your-site.netlify.app)',
+        'User-Agent': 'Mozilla/5.0 (compatible; ContestInfoBot/1.0)',
         'Accept-Language': 'zh-TW,zh;q=0.9',
       },
     });

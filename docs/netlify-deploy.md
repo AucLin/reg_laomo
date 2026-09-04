@@ -32,7 +32,7 @@
 1. 到 https://app.netlify.com 登入（可以直接用 GitHub 帳號登入）
 2. 點 **Add new site** → **Import an existing project**
 3. 選 **Deploy with GitHub**，授權 Netlify 讀取你的 repo
-4. 在清單裡選 **your-account/your-repo**
+4. 在清單裡選你自己這份 repo
 5. 建置設定畫面會自動讀到 `netlify.toml` 的內容，**不用改**：
    - Branch to deploy：`main`
    - Build command：`npm run build`
@@ -57,11 +57,11 @@
 
 ## 第三步：回頭補 Supabase 的網址設定
 
-建置完 Netlify 會給你一個網址，長得像 `https://隨機名稱.netlify.app`。想換好記一點的名字，到 **Site configuration** → **Change site name** 改（例如 `laomo-robot`，網址就變成 `https://laomo-robot.netlify.app`）。
+建置完 Netlify 會給你一個網址，長得像 `https://隨機名稱.netlify.app`。想換好記一點的名字，到 **Site configuration** → **Change site name** 改（例如改成 `your-site`，網址就變成 `https://your-site.netlify.app`）。
 
 拿到正式網址後，**一定要回 Supabase 補設定**，不然註冊確認信裡的連結會指回 `localhost`，家長點了開不起來：
 
-進 https://supabase.com/dashboard 選專案 `your-project-ref` → **Authentication** → **URL Configuration**：
+進 https://supabase.com/dashboard 選你的專案 → **Authentication** → **URL Configuration**：
 
 - **Site URL**：填 Netlify 給的正式網址
 - **Redirect URLs**：加這兩筆

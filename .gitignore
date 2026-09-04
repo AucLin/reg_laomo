@@ -7,3 +7,7 @@ dist
 coverage
 .netlify
 supabase/.temp
+*.tsbuildinfo
+# 這份會被 `supabase config push` 推到雲端，裡面有各自專案的代號與網域。
+# 新環境請複製 supabase/config.example.toml 改成自己的值。
+supabase/config.toml

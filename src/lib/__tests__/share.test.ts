@@ -29,14 +29,14 @@ function makeContest(overrides: Partial<Contest> = {}): Contest {
 
 describe('contestUrl', () => {
   it('指向單場比賽的公開頁', () => {
-    expect(contestUrl('contest-1', 'https://your-site.netlify.app')).toBe(
-      'https://your-site.netlify.app/contests/contest-1'
+    expect(contestUrl('contest-1', 'https://example.com')).toBe(
+      'https://example.com/contests/contest-1'
     );
   });
 });
 
 describe('buildShareText', () => {
-  const url = 'https://your-site.netlify.app/contests/contest-1';
+  const url = 'https://example.com/contests/contest-1';
 
   it('把日期、地點、年級與連結寫成一段可直接貼的文案', () => {
     const text = buildShareText(makeContest(), url);
@@ -91,14 +91,14 @@ function makeSession(overrides: Partial<TrainingSession> = {}): TrainingSession 
 
 describe('myRegistrationsUrl', () => {
   it('指向家長自己的報名頁', () => {
-    expect(myRegistrationsUrl('https://your-site.netlify.app')).toBe(
-      'https://your-site.netlify.app/my'
+    expect(myRegistrationsUrl('https://example.com')).toBe(
+      'https://example.com/my'
     );
   });
 });
 
 describe('buildTrainingNoticeText', () => {
-  const url = 'https://your-site.netlify.app/my';
+  const url = 'https://example.com/my';
 
   it('一場一行，寫出日期、星期與起訖時間', () => {
     const text = buildTrainingNoticeText(

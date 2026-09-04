@@ -1,0 +1,76 @@
+# Supabase 專案設定範本。
+#
+# 用法：複製成 supabase/config.toml，把底下的 your-xxx 換成自己的值，
+# 再用 `supabase link --project-ref <你的專案代號>` 與 `supabase config push` 推上去。
+# config.toml 本身不進版本控制（各自環境的代號與網域不同）。
+
+project_id = "your-project-ref"   # Supabase 專案代號，在網址 https://supabase.com/dashboard/project/<這一段> 裡
+
+# 這份設定會被 `supabase config push` 推送到雲端專案。
+# 推送前必須先設好環境變數 RESEND_SMTP_PASSWORD（Resend 的 API Key），
+# 金鑰不寫進這個檔案，才不會跟著進版本控制。
+
+[auth]
+# 正式網域。漏了這個，認證信裡的連結會指回 localhost，家長點了開不起來。
+site_url = "https://your-site.netlify.app"
+additional_redirect_urls = [
+  "https://your-site.netlify.app/**",
+  "http://localhost:5173/**",
+  "http://localhost:5174/**",
+]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+enable_signup = true
+enable_anonymous_sign_ins = false
+enable_manual_linking = false
+# 前端註冊表單本來就擋 8 個字元，這裡對齊，避免有人繞過前端用 6 位密碼註冊。
+minimum_password_length = 8
+
+# 以下維持雲端專案原本的設定。沒寫出來的話，推送時會被 CLI 預設值蓋掉。
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
+[auth.email]
+enable_signup = true
+# 維持信箱驗證：家長必須收信點連結才能登入，避免假信箱報名。
+enable_confirmations = true
+# 變更信箱時新舊兩邊都要確認。
+double_confirm_changes = true
+secure_password_change = false
+# 同一個信箱兩封信之間至少間隔 1 分鐘，擋濫發。維持雲端原設定。
+max_frequency = "1m0s"
+otp_length = 8
+otp_expiry = 3600
+
+# 每小時可寄出的認證信封數。
+#
+# 雲端專案原本是 2，那是 Supabase 內建寄信服務的限制值，接上自訂 SMTP
+# 之後不會自動放寬。維持 2 的話，報名開放時第三位註冊的家長就收不到
+# 確認信，畫面上還只會顯示一個看不出原因的錯誤。
+#
+# Resend 免費方案是每天 3000 封，這裡設 100 綽綽有餘。
+[auth.rate_limit]
+email_sent = 100
+
+[auth.email.smtp]
+enabled = true
+host = "smtp.resend.com"
+port = 465
+user = "resend"
+pass = "env(RESEND_SMTP_PASSWORD)"
+admin_email = "noreply@your-domain.com"
+sender_name = "老莫機器人"
+
+[auth.email.template.confirmation]
+subject = "請確認您的信箱 — 老莫機器人"
+content_path = "./supabase/templates/confirmation.html"
+
+[auth.email.template.recovery]
+subject = "重設您的密碼 — 老莫機器人"
+content_path = "./supabase/templates/recovery.html"
+
+[auth.email.template.email_change]
+subject = "確認您的新信箱 — 老莫機器人"
+content_path = "./supabase/templates/email_change.html"
