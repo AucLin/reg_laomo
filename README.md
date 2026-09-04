@@ -149,7 +149,7 @@ UPDATE profiles SET role = 'admin' WHERE id = (
 npm run verify:rls
 ```
 
-這支腳本會建兩個測試帳號，實際嘗試越權讀寫別人的資料，逐項印出通過或失敗，跑完自己清乾淨。改過任何 `supabase/migrations/` 底下的政策之後都值得再跑一次。
+這支腳本會建幾個測試帳號，實際嘗試越權讀寫別人的資料，逐項印出通過或失敗，跑完自己清乾淨（要用到 `.env` 裡的 `service_role` 金鑰）。改過任何 `supabase/migrations/` 底下的政策之後都值得再跑一次。
 
 ---
 

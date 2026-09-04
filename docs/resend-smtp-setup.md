@@ -80,6 +80,8 @@ Supabase 要的是 SMTP 形式，對應關係是：
 
 ### 3. 把信件範本改成中文（預設是英文的）
 
+**用 `supabase config push` 的話這一節可以跳過** —— 繁中範本已經放在 `supabase/templates/`，`supabase/config.toml` 指著它們，推上去就生效。下面是手動在主控台貼的版本，給不想用 CLI 的人，也方便對照範本內容。
+
 **Authentication** → **Email Templates**，至少改 **Confirm signup** 這一封。家長收到滿是英文的信會直接當成詐騙信刪掉。
 
 **主旨**：
