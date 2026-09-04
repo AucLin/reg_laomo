@@ -8,9 +8,8 @@
   跟使用者直接貼上文字走同一份邏輯。兩邊各寫一份的話，同樣的公告會
   抓出不一樣的結果。
 
-  只有登入的管理員叫得動。少了這道檢查，這支函式就是一個公開的
-  網頁代理：任何人都能用我們的網址去抓任何網站，帳單與被封鎖的
-  風險都算在我們頭上，而它本來只是後台建比賽時偶爾按一次的功能。
+  這是後台專用的功能，所以呼叫要帶管理員的登入權杖 —— 對外開放的
+  端點就該說清楚誰能用，不然它會被當成一般的網頁代理來用。
 */
 
 const TIMEOUT_MS = 8000;
@@ -67,9 +66,9 @@ function checkUrl(raw) {
   會回 401，有效的話列級權限只會回他自己那一列，所以這一趟同時驗了
   「權杖是真的」與「這個人是管理員」，不必先打一次 /auth/v1/user。
 
-  用 anon 金鑰當 apikey 就夠：真正決定讀得到什麼的是權杖。這裡絕對
-  不可以改用 service_role 金鑰，那會讓列級權限失效，任何一個登入的
-  家長都會被判成管理員。
+  用 anon 金鑰當 apikey 就夠：真正決定讀得到什麼的是權杖。這裡不要
+  改用 service_role 金鑰 —— 那會讓列級權限失效，每個登入的人讀到的
+  都會是同一份資料，這道檢查就沒有意義了。
 */
 async function requireAdmin(req) {
   const token = (req.headers.get('authorization') ?? '').replace(/^Bearer /i, '');
@@ -122,7 +121,7 @@ async function requireAdmin(req) {
 }
 
 export default async (req) => {
-  // 驗身分放在最前面：未授權的請求連一個外部網址都不該讓它觸發
+  // 驗身分放在最前面：沒通過就不該讓它觸發任何對外請求
   const auth = await requireAdmin(req);
   if (!auth.ok) {
     return Response.json({ error: auth.message }, { status: auth.status });

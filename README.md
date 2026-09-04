@@ -24,7 +24,7 @@
 
 React 18 + TypeScript + Vite + Tailwind CSS，路由用 React Router，表單驗證用 Zod，測試用 Vitest + Testing Library。
 
-後端是 Supabase（PostgreSQL + Auth），權限完全靠資料庫的列級安全性（RLS）政策把關 —— 前端拿的是公開的 anon 金鑰，能讀寫什麼由資料庫決定，不是由畫面決定。另有一支 Netlify 無伺服器函式 `/api/contest-info`，替後台代抓比賽官網的網頁（瀏覽器受同源政策擋著抓不到）；它只放行登入的管理員，否則就成了誰都能用的網頁代理。
+後端是 Supabase（PostgreSQL + Auth），權限完全靠資料庫的列級安全性（RLS）政策把關 —— 前端拿的是公開的 anon 金鑰，能讀寫什麼由資料庫決定，不是由畫面決定。另有一支 Netlify 無伺服器函式 `/api/contest-info`，替後台代抓比賽官網的網頁（瀏覽器受同源政策擋著抓不到）；它是後台專用的，呼叫要帶管理員的登入權杖。
 
 ---
 

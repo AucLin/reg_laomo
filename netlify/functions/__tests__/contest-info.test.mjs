@@ -3,9 +3,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import handler from '../contest-info.mjs';
 
 /*
-  這支函式的身分檢查是唯一擋住「被當成公開網頁代理」的東西，所以
-  這裡測的重點不只是「有沒有回 401」，還有「擋下來的時候到底有沒有
-  真的去抓那個網址」—— 先抓再擋等於沒擋，帳單一樣照算。
+  測的重點不只是「有沒有回對狀態碼」，還有「擋下來的時候到底有沒有
+  去抓那個網址」—— 先抓再擋等於沒擋。
 */
 
 const PROFILES = 'https://project.supabase.co/rest/v1/profiles?select=role';

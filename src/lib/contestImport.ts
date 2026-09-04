@@ -15,9 +15,9 @@ export interface ImportResult {
  * HTML 與擋掉內網位址，解析一律用 parseContestText，跟「貼上文字」
  * 走的是同一份邏輯，兩邊才不會給出不同的結果。
  *
- * 要帶登入權杖過去：那支函式只放行管理員，否則它就成了誰都能用的
- * 網頁代理。權杖由 Supabase 的用戶端管理，過期會自動換新，這裡取到
- * 的一定是當下有效的那一把。
+ * 要帶登入權杖過去：那支函式是後台專用的，只放行管理員。權杖由
+ * Supabase 的用戶端管理，過期會自動換新，這裡取到的一定是當下
+ * 有效的那一把。
  */
 export async function importContestFromUrl(url: string): Promise<ImportResult> {
   const {
